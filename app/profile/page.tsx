@@ -61,6 +61,7 @@ export default function ProfilePage() {
   // Profile fields state
   const [name, setName] = useState(user?.name || "")
   const [phone, setPhone] = useState("")
+  const [email, setEmail] = useState("")
   const [address, setAddress] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
 
@@ -97,6 +98,7 @@ export default function ProfilePage() {
     if (profile) {
       setName(profile.full_name || "")
       setPhone(profile.phone || "")
+      setEmail(profile.email || "")
       const localAddress = localStorage.getItem(`address_${profile.username}`) || "123 Đường Láng, Đống Đa, Hà Nội"
       setAddress(localAddress)
     }
@@ -111,7 +113,7 @@ export default function ProfilePage() {
 
   // Update profile mutation calling user-service PUT /users/profile
   const updateProfileMutation = useMutation({
-    mutationFn: async (updatedData: { name: string; phone: string; address: string }) => {
+    mutationFn: async (updatedData: { name: string; phone: string; email: string; address: string }) => {
       const res = await fetch("/api/v1/users/profile", {
         method: "PUT",
         headers: {
@@ -120,7 +122,8 @@ export default function ProfilePage() {
         },
         body: JSON.stringify({
           full_name: updatedData.name,
-          phone: updatedData.phone
+          phone: updatedData.phone,
+          email: updatedData.email
         })
       })
       const data = await res.json()
@@ -135,7 +138,7 @@ export default function ProfilePage() {
     },
     onSuccess: (data) => {
       if (user) {
-        login({ ...user, name: data.full_name, phone: data.phone }, accessToken!, refreshToken!)
+        login({ ...user, name: data.full_name, phone: data.phone, email: data.email }, accessToken!, refreshToken!)
       }
       refetchProfile()
       setSuccessMsg("Cập nhật thông tin hồ sơ thành công!")
@@ -148,7 +151,7 @@ export default function ProfilePage() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
-    updateProfileMutation.mutate({ name, phone, address })
+    updateProfileMutation.mutate({ name, phone, email, address })
   }
 
   const handlePasswordSubmit = async (e: React.FormEvent) => {
@@ -348,9 +351,11 @@ export default function ProfilePage() {
                         <label className="block text-xs font-bold text-[#1E2522]">Địa chỉ Email</label>
                         <input
                           type="email"
-                          disabled
-                          value={profile?.email || user.email || ""}
-                          className="mt-1 block w-full px-3 py-2.5 bg-[#FAF8F2] border border-[#E5DFCE] rounded-xl text-xs font-semibold text-[#8E9B94] cursor-not-allowed"
+                          required
+                          value={email}
+                          onChange={(e) => setEmail(e.target.value)}
+                          className="mt-1 block w-full px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all text-[#1E2522]"
+                          placeholder="example@gmail.com"
                         />
                       </div>
                     </div>
