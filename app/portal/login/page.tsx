@@ -53,13 +53,17 @@ export default function PortalLoginPage() {
 
       const profile = profileData.data;
 
+      if (profile.role !== "admin") {
+        throw new Error("Chỉ tài khoản Quản trị viên (Admin) mới được phép đăng nhập cổng portal này.");
+      }
+
       return {
         user: {
           email: profile.email || `${profile.username}@example.com`,
-          name: role === 'admin' ? `${profile.full_name} (Admin)` : `${profile.full_name} (Staff)`,
+          name: `${profile.full_name} (Admin)`,
           username: profile.username,
           phone: profile.phone,
-          role
+          role: "admin" as const
         },
         accessToken: access_token,
         refreshToken: refresh_token
