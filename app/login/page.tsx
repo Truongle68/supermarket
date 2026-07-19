@@ -204,26 +204,6 @@ export default function LoginPage() {
               </button>
             </div>
           </form>
-
-          {/* Quick Login Helpers */}
-          <div className="mt-6 border-t border-[#F3EFE6] pt-6">
-            <h4 className="text-2xs font-extrabold tracking-wider uppercase text-[#8E9B94] mb-3 text-center">
-              Tài khoản dùng thử nhanh
-            </h4>
-            <div className="flex justify-center">
-              <button
-                type="button"
-                onClick={() => {
-                  setEmail("khachhang@tuoi.vn")
-                  setPassword("123456")
-                }}
-                className="w-full py-2 px-3 text-2xs font-bold rounded-xl border border-[#EBE6DA] bg-[#FAF6EC] hover:bg-[#F3EFE6] text-[#1E2522] transition-all flex items-center justify-center gap-1.5"
-              >
-                👤 Đăng nhập nhanh tài khoản Khách hàng
-              </button>
-            </div>
-          </div>
-
         </div>
       </div>
     </div>
