@@ -4,7 +4,8 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
-import { ArrowLeft, Loader2, Mail, Lock, User, Phone, KeyRound, Check, RefreshCw } from "lucide-react"
+import { authService } from "@/lib/services/auth.service"
+import { ArrowLeft, Loader2, Lock, User, Phone, KeyRound, Check, RefreshCw } from "lucide-react"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -26,6 +27,7 @@ export default function RegisterPage() {
   const [cooldown, setCooldown] = useState(0)
 
   const [errorMsg, setErrorMsg] = useState("")
+  const [isPhoneRegistered, setIsPhoneRegistered] = useState(false)
   const [successMsg, setSuccessMsg] = useState("")
 
   // OTP Timer countdown effect
@@ -53,19 +55,14 @@ export default function RegisterPage() {
       setUsernameCheckLoading(true)
       setUsernameError("")
       try {
-        const res = await fetch(`/api/v1/auth/check-username?username=${encodeURIComponent(username.trim())}`)
-        const data = await res.json()
-        if (res.ok) {
-          setIsUsernameAvailable(data.data.available)
-          if (!data.data.available) {
-            setUsernameError("Tên đăng nhập này đã được sử dụng")
-          }
-        } else {
-          setIsUsernameAvailable(null)
-          setUsernameError(data.message || "Lỗi kiểm tra tên đăng nhập")
+        const data = await authService.checkUsername(username.trim());
+        setIsUsernameAvailable(data.data.available)
+        if (!data.data.available) {
+          setUsernameError("Tên đăng nhập này đã được sử dụng")
         }
-      } catch (err) {
+      } catch (err: any) {
         setIsUsernameAvailable(null)
+        setUsernameError(err.response?.data?.message || err.message || "Lỗi kiểm tra tên đăng nhập")
       } finally {
         setUsernameCheckLoading(false)
       }
@@ -80,17 +77,8 @@ export default function RegisterPage() {
       if (!/^\d{9,11}$/.test(phoneNum)) {
         throw new Error("Số điện thoại không hợp lệ (Phải từ 9-11 số)")
       }
-      
-      const res = await fetch("/api/v1/auth/register/request-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phoneNum, purpose: "register" }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể gửi mã OTP. Vui lòng thử lại.")
-      }
-      return data
+      const data = await authService.requestOtp(phoneNum);
+      return data;
     },
     onSuccess: (data) => {
       setSuccessMsg(`Mã xác thực OTP đã được gửi!`)
@@ -98,7 +86,7 @@ export default function RegisterPage() {
       setCooldown(60) // Start 60s cooldown
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Không thể gửi mã OTP. Vui lòng thử lại.")
+      setErrorMsg(err.response?.data?.message || err.message || "Không thể gửi mã OTP. Vui lòng thử lại.")
     }
   })
 
@@ -108,28 +96,24 @@ export default function RegisterPage() {
       if (!/^\d{6}$/.test(code)) {
         throw new Error("Mã OTP phải gồm 6 chữ số")
       }
-
-      const res = await fetch("/api/v1/auth/register/verify-otp", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ phone: phoneNum, otp_code: code, purpose: "register" }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.message || "Xác thực OTP thất bại. Vui lòng kiểm tra lại mã.")
-      }
-      return data.data
+      const data = await authService.verifyOtp(phoneNum, code);
+      return data.data;
     },
     onSuccess: (data) => {
       setVerificationToken(data.verify_otp_token)
-      setSuccessMsg("Xác thực OTP thành công!")
-      setTimeout(() => {
-        setSuccessMsg("")
-        setStep(3)
-      }, 1000)
+      if (data.user_exists) {
+        setIsPhoneRegistered(true)
+        setErrorMsg(`Số điện thoại này đã được đăng ký với tên tài khoản: ${data.username}`)
+      } else {
+        setSuccessMsg("Xác thực OTP thành công!")
+        setTimeout(() => {
+          setSuccessMsg("")
+          setStep(3)
+        }, 1000)
+      }
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Xác thực OTP thất bại.")
+      setErrorMsg(err.response?.data?.message || err.message || "Xác thực OTP thất bại.")
     }
   })
 
@@ -155,22 +139,14 @@ export default function RegisterPage() {
         throw new Error("Thiếu token xác thực")
       }
 
-      const res = await fetch("/api/v1/auth/register/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: verificationToken,
-          full_name: fullName,
-          username: username.trim(),
-          password: password,
-          confirmed_password: confirmPassword
-        }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể hoàn thành đăng ký.")
-      }
-      return data
+      const data = await authService.completeRegister({
+        token: verificationToken,
+        full_name: fullName,
+        username: username.trim(),
+        password: password,
+        confirmed_password: confirmPassword
+      });
+      return data;
     },
     onSuccess: () => {
       setSuccessMsg("Đăng ký tài khoản thành công! Đang chuyển hướng về trang đăng nhập...")
@@ -179,7 +155,7 @@ export default function RegisterPage() {
       }, 2000)
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Không thể hoàn thành đăng ký.")
+      setErrorMsg(err.response?.data?.message || err.message || "Không thể hoàn thành đăng ký.")
     }
   })
 
@@ -188,6 +164,7 @@ export default function RegisterPage() {
     e.preventDefault()
     setErrorMsg("")
     setSuccessMsg("")
+    setIsPhoneRegistered(false)
     requestOtpMutation.mutate(phone)
   }
 
@@ -281,6 +258,17 @@ export default function RegisterPage() {
           {errorMsg && (
             <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-xs font-semibold">
               {errorMsg}
+              {isPhoneRegistered && (
+                <div className="mt-3 pt-3 border-t border-rose-200/50 flex flex-col gap-2">
+                  <p className="text-rose-800 text-2xs font-bold">Bạn đã có tài khoản với số điện thoại này?</p>
+                  <Link
+                    href="/login"
+                    className="inline-flex justify-center items-center py-2 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-2xs shadow-sm transition-all"
+                  >
+                    Đăng nhập ngay
+                  </Link>
+                </div>
+              )}
             </div>
           )}
 
@@ -309,7 +297,11 @@ export default function RegisterPage() {
                     type="tel"
                     required
                     value={phone}
-                    onChange={(e) => setPhone(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => {
+                      setPhone(e.target.value.replace(/\D/g, ""))
+                      setErrorMsg("")
+                      setIsPhoneRegistered(false)
+                    }}
                     className="block w-full pl-10 pr-4 py-3 border border-[#C6C0B0] bg-[#FDFBF7] rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 text-sm font-medium transition-all"
                     placeholder="Ví dụ: 0987654321"
                   />
@@ -364,7 +356,11 @@ export default function RegisterPage() {
                     maxLength={6}
                     required
                     value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ""))}
+                    onChange={(e) => {
+                      setOtpCode(e.target.value.replace(/\D/g, ""))
+                      setErrorMsg("")
+                      setIsPhoneRegistered(false)
+                    }}
                     className="block w-full pl-10 pr-4 py-3 border border-[#C6C0B0] bg-[#FDFBF7] rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 text-sm font-medium tracking-widest text-center font-mono transition-all"
                     placeholder="••••••"
                   />
