@@ -1,11 +1,13 @@
 import { create } from 'zustand'
 import { persist, createJSONStorage } from 'zustand/middleware'
 import { useEffect, useState } from 'react'
+import { setTokens, clearTokens } from '@/lib/utils/tokenManager'
+import { UserRole } from '@/lib/types'
 
 export interface User {
   email: string
   name: string
-  role: 'user' | 'admin' | 'staff'
+  role: UserRole
   username?: string
   phone?: string
 }
@@ -16,7 +18,7 @@ interface AuthState {
   refreshToken: string | null
   isAuthenticated: boolean
   isHydrated: boolean
-  login: (user: User, accessToken: string, refreshToken: string) => void
+  login: (user: User, accessToken: string, refreshToken: string | null) => void
   logout: () => void
   setHydrated: (state: boolean) => void
 }
@@ -29,8 +31,16 @@ export const useAuthStore = create<AuthState>()(
       refreshToken: null,
       isAuthenticated: false,
       isHydrated: false,
-      login: (user, accessToken, refreshToken) => set({ user, accessToken, refreshToken, isAuthenticated: true }),
-      logout: () => set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false }),
+      login: (user, accessToken, refreshToken) => {
+        if (accessToken) {
+          setTokens(accessToken, refreshToken || "");
+        }
+        set({ user, accessToken, refreshToken, isAuthenticated: true });
+      },
+      logout: () => {
+        clearTokens();
+        set({ user: null, accessToken: null, refreshToken: null, isAuthenticated: false });
+      },
       setHydrated: (state) => set({ isHydrated: state }),
     }),
     {
@@ -70,4 +80,3 @@ export function useAuth() {
     logout: store.logout,
   }
 }
-
