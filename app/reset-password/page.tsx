@@ -4,7 +4,8 @@ import { Suspense, useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
-import { ArrowLeft, Loader2, Lock, CheckCircle2, KeyRound } from "lucide-react"
+import { authService } from "@/lib/services/auth.service"
+import { ArrowLeft, Loader2, Lock, CheckCircle2 } from "lucide-react"
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -36,20 +37,12 @@ function ResetPasswordForm() {
         throw new Error("Mật khẩu xác nhận không trùng khớp")
       }
 
-      const res = await fetch("/api/v1/auth/reset-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          token: token.trim(),
-          new_password: newPassword,
-          confirmed_password: confirmedPassword,
-        }),
-      })
+      const data = await authService.resetPassword({
+        token: token.trim(),
+        new_password: newPassword,
+        confirmed_password: confirmedPassword,
+      });
 
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại token hoặc thông tin.")
-      }
       return data
     },
     onSuccess: () => {
@@ -59,7 +52,7 @@ function ResetPasswordForm() {
       }, 3000)
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại thông tin.")
+      setErrorMsg(err.response?.data?.message || err.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại thông tin.")
     }
   })
 
@@ -69,8 +62,6 @@ function ResetPasswordForm() {
     setSuccessMsg("")
     resetPasswordMutation.mutate()
   }
-
-  const isTokenFromUrl = !!searchParams.get("token")
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#1E2522] font-sans antialiased flex flex-col justify-center py-12 sm:px-6 lg:px-8 relative selection:bg-emerald-100 selection:text-emerald-950">
@@ -131,39 +122,6 @@ function ResetPasswordForm() {
             </div>
           ) : (
             <form className="space-y-5" onSubmit={handleSubmit}>
-              
-              {/* Token Input Section */}
-              <div>
-                <label htmlFor="token" className="block text-sm font-bold text-[#1E2522]">
-                  Mã xác thực token {isTokenFromUrl && <span className="text-emerald-600">(Đã tự động điền)</span>}
-                </label>
-                <div className="mt-1 relative rounded-md shadow-sm">
-                  <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-[#8E9B94]">
-                    <KeyRound className="h-4 w-4" />
-                  </div>
-                  <input
-                    id="token"
-                    name="token"
-                    type="text"
-                    required
-                    disabled={isTokenFromUrl}
-                    value={token}
-                    onChange={(e) => setToken(e.target.value)}
-                    className="block w-full pl-10 pr-4 py-3 border border-[#C6C0B0] bg-[#FDFBF7] rounded-2xl focus:outline-none focus:ring-2 focus:ring-emerald-600/30 focus:border-emerald-600 text-sm font-medium transition-all disabled:bg-[#F3EFE6] disabled:text-[#8E9B94]"
-                    placeholder="Dán mã reset token tại đây"
-                  />
-                </div>
-                {isTokenFromUrl && (
-                  <button
-                    type="button"
-                    onClick={() => router.replace("/reset-password")}
-                    className="mt-1 text-2xs font-bold text-emerald-700 hover:text-emerald-800"
-                  >
-                    Thay đổi hoặc nhập mã thủ công
-                  </button>
-                )}
-              </div>
-
               {/* New Password Input */}
               <div>
                 <label htmlFor="newPassword" className="block text-sm font-bold text-[#1E2522]">

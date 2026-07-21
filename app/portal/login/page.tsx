@@ -5,16 +5,16 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
 import { useAuth } from "@/lib/store/useAuthStore"
-import { ArrowLeft, Loader2, Mail, Lock, ShieldCheck, UserCog, User } from "lucide-react"
+import { authService } from "@/lib/services/auth.service"
+import { setTokens } from "@/lib/utils/tokenManager"
+import { ArrowLeft, Loader2, Lock, UserCog, User } from "lucide-react"
 
 export default function PortalLoginPage() {
   const router = useRouter()
   const { login } = useAuth()
   
   const [identifier, setIdentifier] = useState("")
-  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
-  const [role, setRole] = useState<'admin' | 'staff'>("admin")
   const [errorMsg, setErrorMsg] = useState("")
 
   // Private portal authentication endpoint
@@ -27,35 +27,15 @@ export default function PortalLoginPage() {
         throw new Error("Mật khẩu phải chứa ít nhất 8 ký tự")
       }
 
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin portal.");
-      }
+      const loginData = await authService.portalLogin({ identifier, password });
+      const { access_token, refresh_token } = loginData.data;
 
-      const { access_token, refresh_token } = data.data;
+      // Save tokens in tokenManager so subsequent calls can use it!
+      setTokens(access_token, refresh_token);
 
-      // Fetch user profile info
-      const profileRes = await fetch("/api/v1/users/profile", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${access_token}`
-        }
-      });
-      const profileData = await profileRes.json();
-      if (!profileRes.ok) {
-        throw new Error(profileData.message || "Không thể lấy thông tin hồ sơ.");
-      }
-
+      const profileData = await authService.getProfile();
       const profile = profileData.data;
-
-      if (profile.role !== "admin") {
-        throw new Error("Chỉ tài khoản Quản trị viên (Admin) mới được phép đăng nhập cổng portal này.");
-      }
+      console.log("profile: ", profile)
 
       return {
         user: {
@@ -63,7 +43,7 @@ export default function PortalLoginPage() {
           name: `${profile.full_name} (Admin)`,
           username: profile.username,
           phone: profile.phone,
-          role: "admin" as const
+          role: profile.role
         },
         accessToken: access_token,
         refreshToken: refresh_token
@@ -78,7 +58,7 @@ export default function PortalLoginPage() {
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin portal.")
+      setErrorMsg(err.response?.data?.message || err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin portal.")
     }
   })
 

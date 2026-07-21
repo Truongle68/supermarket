@@ -6,9 +6,12 @@ import { useRouter } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
 import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Lock, User, Phone, KeyRound, Check, RefreshCw } from "lucide-react"
+import { setTokens } from "@/lib/utils/tokenManager"
+import { useAuth } from "@/lib/store/useAuthStore"
 
 export default function RegisterPage() {
   const router = useRouter()
+  const { login } = useAuth()
   
   // Steps: 1 = Request OTP, 2 = Verify OTP, 3 = Complete Profile
   const [step, setStep] = useState<1 | 2 | 3>(1)
@@ -146,12 +149,31 @@ export default function RegisterPage() {
         password: password,
         confirmed_password: confirmPassword
       });
-      return data;
+
+      const { access_token, refresh_token } = data.data;
+      
+      // Save tokens in tokenManager so subsequent calls can use it!
+      setTokens(access_token, refresh_token);
+      
+      const profileData = await authService.getProfile();
+      const profile = profileData.data;
+      return {
+        user: {
+          email: profile.email || `${profile.username}@example.com`,
+          name: profile.full_name || profile.username,
+          username: profile.username,
+          phone: profile.phone,
+          role: profile.role
+        },
+        accessToken: access_token,
+        refreshToken: refresh_token
+      }
     },
-    onSuccess: () => {
-      setSuccessMsg("Đăng ký tài khoản thành công! Đang chuyển hướng về trang đăng nhập...")
+    onSuccess: (data) => {
+      setSuccessMsg("Đăng ký tài khoản thành công! Đang đăng nhập...")
+      login(data.user, data.accessToken, data.refreshToken)
       setTimeout(() => {
-        router.push("/login")
+        router.push("/")
       }, 2000)
     },
     onError: (err: any) => {

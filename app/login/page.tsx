@@ -5,6 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
 import { useAuth } from "@/lib/store/useAuthStore"
+import { authService } from "@/lib/services/auth.service"
+import { setTokens } from "@/lib/utils/tokenManager"
 import { ArrowLeft, Loader2, Mail, Lock, User } from "lucide-react"
 
 export default function LoginPage() {
@@ -12,7 +14,6 @@ export default function LoginPage() {
   const { login } = useAuth()
   
   const [identifier, setIdentifier] = useState("")
-  const [email, setEmail] = useState("")
   const [password, setPassword] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
 
@@ -26,30 +27,13 @@ export default function LoginPage() {
         throw new Error("Mật khẩu phải chứa ít nhất 8 ký tự")
       }
 
-      const res = await fetch("/api/v1/auth/login", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ identifier, password }),
-      });
-      const data = await res.json();
-      if (!res.ok) {
-        throw new Error(data.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin.");
-      }
+      const loginData = await authService.login({ identifier, password });
+      const { access_token, refresh_token } = loginData.data;
 
-      const { access_token, refresh_token } = data.data;
+      // Save tokens in tokenManager so subsequent calls can use it!
+      setTokens(access_token, refresh_token);
 
-      // Fetch user profile info
-      const profileRes = await fetch("/api/v1/users/profile", {
-        method: "GET",
-        headers: {
-          "Authorization": `Bearer ${access_token}`
-        }
-      });
-      const profileData = await profileRes.json();
-      if (!profileRes.ok) {
-        throw new Error(profileData.message || "Không thể lấy thông tin hồ sơ.");
-      }
-
+      const profileData = await authService.getProfile();
       const profile = profileData.data;
 
       return {
@@ -58,7 +42,7 @@ export default function LoginPage() {
           name: profile.full_name || profile.username,
           username: profile.username,
           phone: profile.phone,
-          role: "user" as const
+          role: profile.role
         },
         accessToken: access_token,
         refreshToken: refresh_token
@@ -69,7 +53,7 @@ export default function LoginPage() {
       router.push("/")
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin.")
+      setErrorMsg(err.response?.data?.message || err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin.")
     }
   })
 

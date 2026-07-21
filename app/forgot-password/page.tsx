@@ -3,35 +3,24 @@
 import { useState } from "react"
 import Link from "next/link"
 import { useMutation } from "@tanstack/react-query"
+import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Mail, CheckCircle2 } from "lucide-react"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
-  const [devToken, setDevToken] = useState("")
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async () => {
-      const res = await fetch("/api/v1/auth/forgot-password", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email }),
-      })
-      const data = await res.json()
-      if (!res.ok) {
-        throw new Error(data.message || "Không thể thực hiện yêu cầu. Vui lòng kiểm tra lại email.")
-      }
+      const data = await authService.forgotPassword(email);
       return data.data
     },
-    onSuccess: (data) => {
+    onSuccess: () => {
       setSuccessMsg("Yêu cầu khôi phục mật khẩu đã được gửi thành công! Vui lòng kiểm tra hộp thư của bạn.")
-      if (data && data.reset_token) {
-        setDevToken(data.reset_token)
-      }
     },
     onError: (err: any) => {
-      setErrorMsg(err.message || "Không thể thực hiện yêu cầu. Vui lòng kiểm tra lại email.")
+      setErrorMsg(err.response?.data?.message || err.message || "Không thể thực hiện yêu cầu. Vui lòng kiểm tra lại email.")
     }
   })
 
@@ -39,7 +28,6 @@ export default function ForgotPasswordPage() {
     e.preventDefault()
     setErrorMsg("")
     setSuccessMsg("")
-    setDevToken("")
     forgotPasswordMutation.mutate()
   }
 
@@ -90,22 +78,6 @@ export default function ForgotPasswordPage() {
               <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-sm font-semibold">
                 {successMsg}
               </div>
-
-              {devToken && (
-                <div className="bg-amber-50 border border-amber-200 text-amber-900 p-4 rounded-2xl text-xs font-semibold text-left space-y-2">
-                  <p className="font-bold text-amber-950">🛠️ Developer Mode Assist:</p>
-                  <p>Hệ thống đang chạy SMTP. Token khôi phục mật khẩu cũng được gửi về trong API:</p>
-                  <code className="block bg-amber-100 p-2 rounded text-center select-all font-mono break-all my-1">{devToken}</code>
-                  <div className="pt-2 text-center">
-                    <Link
-                      href={`/reset-password?token=${devToken}`}
-                      className="inline-block bg-amber-600 hover:bg-amber-700 text-white font-bold px-4 py-2 rounded-xl transition-all"
-                    >
-                      Đến trang đổi mật khẩu trực tiếp ➜
-                    </Link>
-                  </div>
-                </div>
-              )}
 
               <div className="pt-4">
                 <Link
