@@ -4,33 +4,46 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/lib/store/useAuthStore"
-import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Phone, CheckCircle, AlertCircle } from "lucide-react"
+import userService from "@/lib/services/user.service"
 
 function ChangePhoneForm() {
   const router = useRouter()
+  const searchParams = useSearchParams()
+  const token = searchParams.get("token")
   const { user, accessToken, refreshToken, login } = useAuth()
 
   const [newPhone, setNewPhone] = useState("")
+  const [changePhoneToken, setChangePhoneToken] = useState("")
   const [otpCode, setOtpCode] = useState("")
   const [otpSent, setOtpSent] = useState(false)
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
   const [loading, setLoading] = useState(false)
 
+  useEffect(() => {
+    if (token) {
+      setChangePhoneToken(token)
+    } else {
+      setErrorMsg("Không tìm thấy mã xác thực (token). Vui lòng thực hiện xác thực từ trang Hồ sơ.")
+    }
+  }, [token])
+
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!newPhone.trim()) return
+
+    if (!changePhoneToken) {
+      setErrorMsg("Thiếu token xác thực. Vui lòng thực hiện xác thực tài khoản từ trang Hồ sơ.")
+      return
+    }
 
     setErrorMsg("")
     setSuccessMsg("")
     setLoading(true)
 
     try {
-      await authService.sendAccountOtp({
-        identifier: newPhone.trim(),
-        purpose: "change_phone",
-      })
+      await userService.changePhone(newPhone.trim(), changePhoneToken)
       setOtpSent(true)
       setSuccessMsg(`Mã OTP xác thực đã được gửi đến số điện thoại: ${newPhone.trim()}`)
     } catch (err: any) {
@@ -52,12 +65,11 @@ function ChangePhoneForm() {
     setLoading(true)
 
     try {
-      await authService.verifyAccountOtp({
-        identifier: newPhone.trim(),
-        code: otpCode,
-        purpose: "change_phone",
+      await userService.changePhoneConfirm({
+        code: otpCode.trim(),
+        phone: newPhone.trim()
       })
-
+      setLoading(true)
       setSuccessMsg("Cập nhật số điện thoại thành công!")
 
       if (user && accessToken && refreshToken) {
@@ -66,10 +78,9 @@ function ChangePhoneForm() {
 
       setTimeout(() => {
         router.push("/profile")
-      }, 2500)
+      }, 1000)
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || "Mã OTP không đúng hoặc đã hết hạn.")
-    } finally {
       setLoading(false)
     }
   }
@@ -83,7 +94,7 @@ function ChangePhoneForm() {
         </div>
       )}
 
-      {successMsg && !otpSent && (
+      {successMsg  && !otpSent && (
         <div className="space-y-6 text-center py-4">
           <div className="flex justify-center">
             <CheckCircle className="w-16 h-16 text-emerald-600 animate-bounce" />
@@ -165,7 +176,10 @@ function ChangePhoneForm() {
           <div className="flex gap-3">
             <button
               type="button"
-              onClick={() => setOtpSent(false)}
+              onClick={() => {
+                setOtpSent(false)
+                setSuccessMsg("")
+              }}
               disabled={loading}
               className="flex-1 py-3 px-4 border border-[#C6C0B0] hover:bg-neutral-50 text-[#5D6B63] font-bold rounded-2xl text-xs transition-all cursor-pointer"
             >
@@ -177,7 +191,10 @@ function ChangePhoneForm() {
               className="flex-1 flex justify-center items-center py-3 px-4 border border-transparent rounded-2xl shadow-sm text-xs font-bold text-white bg-[#1B4D3E] hover:bg-[#12362C] focus:outline-none disabled:opacity-50 transition-all cursor-pointer"
             >
               {loading ? (
+                <>
                 <Loader2 className="w-4 h-4 animate-spin" />
+                Đang xác nhận...
+                </>
               ) : (
                 "Xác nhận cập nhật"
               )}

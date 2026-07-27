@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/lib/store/useAuthStore"
-import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Mail, CheckCircle, AlertCircle } from "lucide-react"
+import userService from "@/lib/services/user.service"
 
 function ChangeEmailForm() {
   const searchParams = useSearchParams()
@@ -32,7 +32,7 @@ function ChangeEmailForm() {
 
     const checkToken = async () => {
       try {
-        const res = await authService.confirmEmailLink(token)
+        const res = await userService.confirmEmailLink(token)
         const data = res.data
         if (data?.change_email_token) {
           setChangeEmailToken(data.change_email_token)
@@ -62,10 +62,9 @@ function ChangeEmailForm() {
     setSubmitting(true)
 
     try {
-      await authService.sendAccountOtp({
-        identifier: newEmail.trim(),
-        purpose: "change_email",
+      await userService.changeEmail({
         change_email_token: changeEmailToken,
+        identifier: newEmail.trim()
       })
       setOtpSent(true)
       setSuccessMsg(`Mã OTP đã được gửi tới email mới: ${newEmail.trim()}. Vui lòng kiểm tra hộp thư!`)
@@ -89,10 +88,9 @@ function ChangeEmailForm() {
     setSubmitting(true)
 
     try {
-      await authService.verifyAccountOtp({
-        identifier: newEmail.trim(),
+      await userService.changeEmailConfirm({
         code: otpCode,
-        purpose: "change_email",
+        identifier: newEmail.trim()
       })
       setSuccessMsg("Cập nhật địa chỉ Email mới thành công!")
 
@@ -102,10 +100,9 @@ function ChangeEmailForm() {
 
       setTimeout(() => {
         router.push("/profile")
-      }, 2500)
+      }, 1000)
     } catch (err: any) {
       setErrorMsg(err.response?.data?.message || err.message || "Mã OTP không đúng hoặc đã hết hạn.")
-    } finally {
       setSubmitting(false)
     }
   }

@@ -4,7 +4,6 @@ import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/store/useAuthStore"
-import { authService } from "@/lib/services/auth.service"
 import { userService } from "@/lib/services/user.service"
 import locationService from "@/lib/services/location.service"
 import { Address, AddressLabel } from "@/lib/types"
@@ -31,32 +30,17 @@ import {
   Star
 } from "lucide-react"
 
-// Mock Order History Data
-const fetchOrders = async () => {
-  await new Promise((resolve) => setTimeout(resolve, 600))
-  return [
-    {
-      id: "ORD-94827",
-      date: "12/07/2026",
-      status: "delivering",
-      total: "185.000đ",
-      items: "🥦 Cà chua bi hữu cơ x2, 🥑 Bơ sáp x1"
-    },
-    {
-      id: "ORD-91048",
-      date: "05/07/2026",
-      status: "completed",
-      total: "420.000đ",
-      items: "🥩 Bò Mỹ phi lê x1, 🥚 Trứng gà sạch x2"
-    },
-    {
-      id: "ORD-89304",
-      date: "28/06/2026",
-      status: "cancelled",
-      total: "95.000đ",
-      items: "🥤 Trà sữa hữu cơ x2"
-    }
-  ]
+export interface OrderHistory {
+  id: string
+  date: string
+  status: string
+  total: string
+  items: string
+}
+
+// Fetch user order history (empty state)
+const fetchOrders = async (): Promise<OrderHistory[]> => {
+  return []
 }
 
 export default function ProfilePage() {
@@ -92,7 +76,6 @@ export default function ProfilePage() {
   // Change Phone Modal State
   const [showPhoneModal, setShowPhoneModal] = useState(false)
   const [phoneStep, setPhoneStep] = useState<1 | 2>(1)
-  const [newPhone, setNewPhone] = useState("")
   const [phoneOtpCode, setPhoneOtpCode] = useState("")
   const [phoneModalError, setPhoneModalError] = useState("")
   const [phoneModalSuccess, setPhoneModalSuccess] = useState("")
@@ -197,8 +180,7 @@ export default function ProfilePage() {
   const saveAddressMutation = useMutation({
     mutationFn: async () => {
       if (editingAddress) {
-        return userService.updateAddress({
-          id: editingAddress.id,
+        return userService.updateAddress(editingAddress.id, {
           label: addrLabel,
           address_line: addrLine,
           ward: addrWard,
@@ -242,19 +224,12 @@ export default function ProfilePage() {
 
   // Change Phone Workflow Functions
   const handleSendPhoneOTP = async () => {
-    if (!newPhone.trim()) {
-      setPhoneModalError("Vui lòng nhập số điện thoại mới")
-      return
-    }
     setPhoneModalError("")
     setPhoneModalSuccess("")
     setPhoneModalLoading(true)
     try {
-      await authService.sendAccountOtp({
-        identifier: newPhone.trim(),
-        purpose: "change_phone",
-      })
-      setPhoneModalSuccess(`Mã OTP xác thực đã được gửi tới số điện thoại ${newPhone.trim()}.`)
+      await userService.verifyPhone()
+      setPhoneModalSuccess(`Mã OTP xác thực đã được gửi tới số điện thoại ${phone.trim()}.`)
       setPhoneStep(2)
     } catch (err: any) {
       setPhoneModalError(err.response?.data?.message || err.message || "Có lỗi xảy ra khi gửi mã OTP.")
@@ -262,6 +237,12 @@ export default function ProfilePage() {
       setPhoneModalLoading(false)
     }
   }
+
+  useEffect(() => {
+    if (showPhoneModal) {
+      router.prefetch("/profile/change-phone")
+    }
+  }, [showPhoneModal, router])
 
   const handleVerifyPhoneOTP = async () => {
     if (phoneOtpCode.length !== 6) {
@@ -272,27 +253,19 @@ export default function ProfilePage() {
     setPhoneModalSuccess("")
     setPhoneModalLoading(true)
     try {
-      await authService.verifyAccountOtp({
-        identifier: newPhone.trim(),
-        code: phoneOtpCode,
-        purpose: "change_phone",
-      })
-      setPhoneModalSuccess("Cập nhật số điện thoại mới thành công!")
-      setPhone(newPhone.trim())
-      if (user) {
-        login({ ...user, phone: newPhone.trim() }, accessToken!, refreshToken!)
+      const { data } = await userService.verifyPhoneConfirm(phoneOtpCode.trim())
+      if (data?.change_phone_token) {
+        setPhoneModalSuccess("Xác thực thành công! Đang chuyển hướng...")
+        setPhoneModalLoading(true)
+        
+        setTimeout(() => {
+          router.push(`/profile/change-phone?token=${encodeURIComponent(data.change_phone_token)}`)
+        }, 1000)
+      } else {
+        setPhoneModalLoading(false)
       }
-      refetchProfile()
-      setTimeout(() => {
-        setShowPhoneModal(false)
-        setPhoneStep(1)
-        setNewPhone("")
-        setPhoneOtpCode("")
-        setPhoneModalSuccess("")
-      }, 2000)
     } catch (err: any) {
       setPhoneModalError(err.response?.data?.message || err.message || "Mã OTP không đúng hoặc đã hết hạn.")
-    } finally {
       setPhoneModalLoading(false)
     }
   }
@@ -302,7 +275,7 @@ export default function ProfilePage() {
     queryKey: ["userProfile", user?.username],
     queryFn: async () => {
       if (!accessToken) return null
-      const data = await authService.getProfile()
+      const data = await userService.getProfile()
       return data.data
     },
     enabled: !!accessToken,
@@ -316,7 +289,7 @@ export default function ProfilePage() {
       setEmail(profile.email || "")
       setGender(profile.gender || "")
       setDob(profile.dob || "")
-      const localAddress = localStorage.getItem(`address_${profile.username}`) || "123 Đường Láng, Đống Đa, Hà Nội"
+      const localAddress = localStorage.getItem(`address_${profile.username}`) || ""
       setAddress(localAddress)
     }
   }, [profile])
@@ -331,7 +304,7 @@ export default function ProfilePage() {
   // Update profile mutation calling user-service POST /users/update-profile
   const updateProfileMutation = useMutation({
     mutationFn: async (updatedData: { email?: string; name: string; gender: string; dob: string; address: string }) => {
-      const data = await authService.updateProfile({
+      const data = await userService.updateProfile({
         email: updatedData.email,
         full_name: updatedData.name,
         gender: updatedData.gender as any,
@@ -359,7 +332,7 @@ export default function ProfilePage() {
   // Request verification email mutation
   const requestVerifyEmailMutation = useMutation({
     mutationFn: async () => {
-      const data = await authService.requestEmailLink(email)
+      const data = await userService.requestEmailLink(email)
       return data
     },
     onSuccess: () => {
@@ -1055,7 +1028,7 @@ export default function ProfilePage() {
                     setEmailModalError("")
                     setEmailModalSuccess("")
                     try {
-                      await authService.requestChangeEmail(email)
+                      await userService.requestChangeEmail(email)
                       setEmailModalSuccess("Liên kết xác thực đã được gửi tới email của bạn! Vui lòng kiểm tra hộp thư.")
                     } catch (err: any) {
                       setEmailModalError(err.response?.data?.message || err.message || "Không thể gửi email xác thực.")
@@ -1079,7 +1052,6 @@ export default function ProfilePage() {
               onClick={() => {
                 setShowPhoneModal(false)
                 setPhoneStep(1)
-                setNewPhone("")
                 setPhoneOtpCode("")
                 setPhoneModalError("")
                 setPhoneModalSuccess("")
@@ -1089,96 +1061,110 @@ export default function ProfilePage() {
               <X className="w-4 h-4" />
             </button>
 
-            <div className="mb-6">
-              <h3 className="text-xl font-extrabold text-[#16422F] tracking-tight">Thay đổi Số điện thoại</h3>
-              <p className="text-xs text-[#64716A] mt-1 font-semibold">Nhận mã OTP để xác thực số điện thoại mới</p>
-            </div>
-
-            {phoneModalError && (
-              <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-2xl text-xs font-semibold">
-                {phoneModalError}
+            {phoneStep === 1 ? (
+              <div className="mb-6">
+                <h3 className="text-xl font-extrabold text-[#16422F] tracking-tight">Xác thực tài khoản</h3>
+                <p className="text-xs text-[#64716A] mt-1 font-semibold">Để tăng cường bảo mật cho tài khoản của bạn, hãy xác minh thông tin bằng một trong những cách sau</p>
+              </div>
+            ): (
+              <div className="mb-6">
+                <h3 className="text-xl font-extrabold text-[#16422F] tracking-tight">Thay đổi Số điện thoại</h3>
+                <p className="text-xs text-[#64716A] mt-1 font-semibold">Nhận mã OTP để xác thực số điện thoại mới</p>
               </div>
             )}
 
-            {phoneModalSuccess && (
-              <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
-                {phoneModalSuccess}
-              </div>
-            )}
 
-            {phoneStep === 1 && (
-              <div className="space-y-4">
-                <p className="text-xs text-[#5D6B63] font-semibold leading-relaxed">
-                  Nhập số điện thoại mới bạn muốn liên kết với tài khoản này:
-                </p>
-                <div>
-                  <input
-                    type="tel"
-                    required
-                    value={newPhone}
-                    onChange={(e) => setNewPhone(e.target.value)}
-                    className="block w-full px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all text-[#1E2522]"
-                    placeholder="VD: 0987654321"
-                  />
+            {phoneModalSuccess && phoneModalLoading ? (
+              <div className="py-6 text-center space-y-4 animate-in fade-in duration-300">
+                <div className="flex justify-center">
+                  <Loader2 className="w-10 h-10 text-[#1B4D3E] animate-spin" />
                 </div>
-                <button
-                  onClick={handleSendPhoneOTP}
-                  disabled={phoneModalLoading || !newPhone.trim()}
-                  className="w-full flex justify-center items-center py-2.5 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-xs transition-all disabled:opacity-50 cursor-pointer"
-                >
-                  {phoneModalLoading ? (
-                    <>
-                      <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
-                      Đang gửi mã...
-                    </>
-                  ) : (
-                    "Gửi mã OTP xác thực"
-                  )}
-                </button>
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
+                  {phoneModalSuccess}
+                </div>
               </div>
-            )}
+            ) : (
+              <>
+                {phoneModalError && (
+                  <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-3.5 rounded-2xl text-xs font-semibold">
+                    {phoneModalError}
+                  </div>
+                )}
 
-            {phoneStep === 2 && (
-              <div className="space-y-4">
-                <p className="text-xs text-[#5D6B63] font-semibold leading-relaxed">
-                  Nhập mã OTP gồm 6 chữ số đã gửi đến số điện thoại mới: <strong className="text-[#1E2522]">{newPhone}</strong>
-                </p>
-                <div>
-                  <input
-                    type="text"
-                    required
-                    maxLength={6}
-                    value={phoneOtpCode}
-                    onChange={(e) => setPhoneOtpCode(e.target.value)}
-                    className="block w-full text-center tracking-[0.5em] text-lg font-bold px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all text-[#1E2522]"
-                    placeholder="••••••"
-                  />
-                </div>
-                <div className="flex gap-3">
-                  <button
-                    onClick={() => {
-                      setPhoneStep(1)
-                      setPhoneModalError("")
-                      setPhoneModalSuccess("")
-                    }}
-                    disabled={phoneModalLoading}
-                    className="flex-1 py-2.5 px-4 border border-[#C6C0B0] hover:bg-neutral-50 text-[#5D6B63] font-bold rounded-xl text-xs transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    Quay lại
-                  </button>
-                  <button
-                    onClick={handleVerifyPhoneOTP}
-                    disabled={phoneModalLoading || phoneOtpCode.length !== 6}
-                    className="flex-1 flex justify-center items-center py-2.5 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-xs transition-all disabled:opacity-50 cursor-pointer"
-                  >
-                    {phoneModalLoading ? (
-                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
-                    ) : (
-                      "Xác nhận cập nhật"
-                    )}
-                  </button>
-                </div>
-              </div>
+                {phoneModalSuccess && (
+                  <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
+                    {phoneModalSuccess}
+                  </div>
+                )}
+
+                {phoneStep === 1 && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-[#5D6B63] font-semibold leading-relaxed">
+                      Xác minh bằng mã OTP gửi qua SMS:
+                    </p>
+                    <button
+                      onClick={handleSendPhoneOTP}
+                      disabled={phoneModalLoading}
+                      className="w-full flex justify-center items-center py-2.5 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-xs transition-color duration-300 ease-in-out cursor-pointer"
+                    >
+                      {phoneModalLoading ? (
+                        <>
+                          <Loader2 className="w-3.5 h-3.5 mr-1.5 animate-spin" />
+                          Đang gửi mã...
+                        </>
+                      ) : (
+                        "Gửi mã OTP xác thực"
+                      )}
+                    </button>
+                  </div>
+                )}
+
+                {phoneStep === 2 && (
+                  <div className="space-y-4">
+                    <p className="text-xs text-[#5D6B63] font-semibold leading-relaxed">
+                      Nhập mã OTP gồm 6 chữ số
+                    </p>
+                    <div>
+                      <input
+                        type="text"
+                        required
+                        maxLength={6}
+                        value={phoneOtpCode}
+                        onChange={(e) => setPhoneOtpCode(e.target.value)}
+                        className="block w-full text-center tracking-[0.5em] text-lg font-bold px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all text-[#1E2522]"
+                        placeholder="••••••"
+                      />
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        onClick={() => {
+                          setPhoneStep(1)
+                          setPhoneModalError("")
+                          setPhoneModalSuccess("")
+                        }}
+                        disabled={phoneModalLoading}
+                        className="flex-1 py-2.5 px-4 border border-[#C6C0B0] hover:bg-neutral-50 text-[#5D6B63] font-bold rounded-xl text-xs transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        Quay lại
+                      </button>
+                      <button
+                        onClick={handleVerifyPhoneOTP}
+                        disabled={phoneModalLoading || phoneOtpCode.length !== 6}
+                        className="flex-1 flex justify-center items-center gap-1.5 py-2.5 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-xs transition-all disabled:opacity-50 cursor-pointer"
+                      >
+                        {phoneModalLoading ? (
+                          <>
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                            <span>Đang xử lý...</span>
+                          </>
+                        ) : (
+                          "Xác nhận"
+                        )}
+                      </button>
+                    </div>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>

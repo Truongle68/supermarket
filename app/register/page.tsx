@@ -8,6 +8,7 @@ import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Lock, User, Phone, KeyRound, Check, RefreshCw } from "lucide-react"
 import { setTokens } from "@/lib/utils/tokenManager"
 import { useAuth } from "@/lib/store/useAuthStore"
+import userService from "@/lib/services/user.service"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -155,7 +156,7 @@ export default function RegisterPage() {
       // Save tokens in tokenManager so subsequent calls can use it!
       setTokens(access_token, refresh_token);
       
-      const profileData = await authService.getProfile();
+      const profileData = await userService.getProfile();
       const profile = profileData.data;
       return {
         user: {

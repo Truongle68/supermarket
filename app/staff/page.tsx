@@ -13,28 +13,17 @@ import {
   ShieldAlert, 
   LogOut, 
   ExternalLink,
-  ChevronRight,
-  ArrowRight,
-  TrendingUp,
-  AlertCircle,
-  Truck,
   Loader2,
   RefreshCw
 } from "lucide-react"
 
-// Mock order list for packing board
-const initialOrders = [
-  { id: "ORD-94827", customer: "Nguyễn Văn Hùng", address: "123 Đường Láng, Hà Nội", items: "🥦 Cà chua bi hữu cơ x2, 🥑 Bơ sáp Đắk Lắk x1", status: "pending" },
-  { id: "ORD-94824", customer: "Lê Thị Hồng", address: "45 Hàng Bài, Hoàn Kiếm, Hà Nội", items: "🥬 Rau muống nước sạch x4, 🥚 Trứng gà sạch x2", status: "packing" },
-  { id: "ORD-94830", customer: "Đỗ Minh Quân", address: "88 Cầu Giấy, Hà Nội", items: "🥩 Bơ sáp Đắk Lắk x2, 🍎 Táo Envy nhập khẩu x2", status: "pending" },
-  { id: "ORD-94831", customer: "Hoàng Thanh Hà", address: "12 Chùa Bộc, Đống Đa, Hà Nội", items: "🥚 Trứng gà sạch x1, 🥦 Cà chua bi hữu cơ x3", status: "ready" },
-  { id: "ORD-94832", customer: "Nguyễn Bích Ngọc", address: "55 Kim Mã, Ba Đình, Hà Nội", items: "🥤 Trà sữa hữu cơ x3", status: "pending" }
-]
+// Initial order list for packing board (empty state)
+const initialOrders: Array<{ id: string; customer: string; address: string; items: string; status: string }> = []
 
 export default function StaffDashboard() {
   const router = useRouter()
   const queryClient = useQueryClient()
-  const { user, isAuthenticated, logout } = useAuth()
+  const { user, isAuthenticated, isHydrated, logout } = useAuth()
   const [searchTerm, setSearchTerm] = useState("")
   const [orders, setOrders] = useState(initialOrders)
 
@@ -52,7 +41,15 @@ export default function StaffDashboard() {
   })
 
   // Access guard
-  if (!isAuthenticated || !user || user.role !== "staff") {
+  if (!isHydrated) {
+    return (
+      <div className="min-h-screen bg-slate-950 flex items-center justify-center p-4">
+        <Loader2 className="w-8 h-8 text-emerald-500 animate-spin" />
+      </div>
+    )
+  }
+
+  if (!isAuthenticated || !user || (user.role?.toLowerCase() !== "staff" && user.role?.toLowerCase() !== "admin")) {
     return (
       <div className="min-h-screen bg-slate-950 flex flex-col justify-center items-center p-4">
         <div className="bg-slate-900 border border-slate-800 p-8 rounded-[1.3rem] text-center max-w-sm w-full shadow-2xl">
@@ -292,8 +289,10 @@ export default function StaffDashboard() {
                 </table>
               </div>
             ) : (
-              <div className="text-center py-16 text-[#8E9B94]">
-                <p className="text-sm font-semibold">Không tìm thấy đơn hàng nào trong hàng đợi.</p>
+              <div className="text-center py-16 bg-[#FAF6EC]/40 border border-dashed border-[#C6C0B0] rounded-2xl p-6">
+                <Package className="w-12 h-12 text-[#8E9B94] mx-auto mb-3 opacity-60" />
+                <h4 className="text-sm font-extrabold text-[#16422F]">Hàng đợi đóng gói trống</h4>
+                <p className="text-xs text-[#64716A] font-semibold mt-1">Hiện tại không có đơn hàng nào cần soạn hoặc đóng gói.</p>
               </div>
             )}
 

@@ -8,6 +8,8 @@ import { useAuth } from "@/lib/store/useAuthStore"
 import { authService } from "@/lib/services/auth.service"
 import { setTokens } from "@/lib/utils/tokenManager"
 import { ArrowLeft, Loader2, Lock, UserCog, User } from "lucide-react"
+import userService from "@/lib/services/user.service"
+import { UserRole } from "@/lib/types"
 
 export default function PortalLoginPage() {
   const router = useRouter()
@@ -33,17 +35,20 @@ export default function PortalLoginPage() {
       // Save tokens in tokenManager so subsequent calls can use it!
       setTokens(access_token, refresh_token);
 
-      const profileData = await authService.getProfile();
+      const profileData = await userService.getProfile();
       const profile = profileData.data;
       console.log("profile: ", profile)
+
+      const rawRole = (profile.role || 'admin').toLowerCase()
+      const normalizedRole: UserRole = (rawRole === 'staff' ? 'staff' : 'admin') as UserRole
 
       return {
         user: {
           email: profile.email || `${profile.username}@example.com`,
-          name: `${profile.full_name} (Admin)`,
+          name: profile.full_name || profile.username,
           username: profile.username,
           phone: profile.phone,
-          role: profile.role
+          role: normalizedRole
         },
         accessToken: access_token,
         refreshToken: refresh_token
@@ -51,10 +56,11 @@ export default function PortalLoginPage() {
     },
     onSuccess: (data) => {
       login(data.user, data.accessToken, data.refreshToken)
-      if (data.user.role === "admin") {
-        router.push("/admin")
-      } else if (data.user.role === "staff") {
+      const role = data.user.role?.toLowerCase()
+      if (role === "staff") {
         router.push("/staff")
+      } else {
+        router.push("/admin")
       }
     },
     onError: (err: any) => {

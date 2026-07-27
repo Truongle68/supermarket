@@ -7,7 +7,9 @@ import { useMutation } from "@tanstack/react-query"
 import { useAuth } from "@/lib/store/useAuthStore"
 import { authService } from "@/lib/services/auth.service"
 import { setTokens } from "@/lib/utils/tokenManager"
-import { ArrowLeft, Loader2, Mail, Lock, User } from "lucide-react"
+import { ArrowLeft, Loader2, Lock, User } from "lucide-react"
+import userService from "@/lib/services/user.service"
+import { UserRole } from "@/lib/types"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -33,8 +35,11 @@ export default function LoginPage() {
       // Save tokens in tokenManager so subsequent calls can use it!
       setTokens(access_token, refresh_token);
 
-      const profileData = await authService.getProfile();
+      const profileData = await userService.getProfile();
       const profile = profileData.data;
+
+      const rawRole = (profile.role || 'user').toLowerCase()
+      const normalizedRole: UserRole = (rawRole === 'admin' ? 'admin' : rawRole === 'staff' ? 'staff' : 'user') as UserRole
 
       return {
         user: {
@@ -42,7 +47,7 @@ export default function LoginPage() {
           name: profile.full_name || profile.username,
           username: profile.username,
           phone: profile.phone,
-          role: profile.role
+          role: normalizedRole
         },
         accessToken: access_token,
         refreshToken: refresh_token
@@ -50,7 +55,14 @@ export default function LoginPage() {
     },
     onSuccess: (data) => {
       login(data.user, data.accessToken, data.refreshToken)
-      router.push("/")
+      const role = data.user.role?.toLowerCase()
+      if (role === 'admin') {
+        router.push("/admin")
+      } else if (role === 'staff') {
+        router.push("/staff")
+      } else {
+        router.push("/")
+      }
     },
     onError: (err: any) => {
       setErrorMsg(err.response?.data?.message || err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin.")

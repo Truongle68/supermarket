@@ -4,8 +4,8 @@ import { useState, useEffect, Suspense } from "react"
 import { useSearchParams, useRouter } from "next/navigation"
 import Link from "next/link"
 import { useAuth } from "@/lib/store/useAuthStore"
-import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from "lucide-react"
+import userService from "@/lib/services/user.service"
 
 function ConfirmEmailLinkContent() {
   const searchParams = useSearchParams()
@@ -26,7 +26,7 @@ function ConfirmEmailLinkContent() {
 
     const confirmToken = async () => {
       try {
-        const res = await authService.confirmEmailLink(token)
+        const res = await userService.confirmEmailLink(token)
         const data = res.data
 
         if (data?.change_email_token) {
@@ -38,7 +38,7 @@ function ConfirmEmailLinkContent() {
         // If purpose was verify_new_email (verifying new/first email)
         if (accessToken) {
           try {
-            const profileRes = await authService.getProfile()
+            const profileRes = await userService.getProfile()
             if (profileRes?.data && user) {
               login(
                 {
