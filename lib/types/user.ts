@@ -41,31 +41,34 @@ export interface ChangeEmailConfirmRequest {
   code: string;
 }
 
-export interface ChangeEmailConfirmResponse {
-  token?: string;
+export interface VerifyPhoneConfirmRequest {
+  code: string;
+}
+
+export interface VerifyPhoneConfirmResponse {
+  change_phone_token: string;
 }
 
 export interface ChangePhoneRequest {
   phone: string;
+  change_phone_token: string;
 }
 
-export interface ChangePhoneVerifyRequest {
+export interface ChangePhoneConfirmRequest {
   phone: string;
   code: string;
 }
 
-export interface ChangePhoneVerifyResponse {
-  token?: string;
-}
-
 export interface SendAccountOtpRequest {
   identifier: string;
-  purpose: "change_email" | "change_phone";
+  purpose: "change_email" | "verify_phone" | "change_phone";
   change_email_token?: string;
+  change_phone_token?: string;
 }
 
 export interface VerifyAccountOtpRequest {
-  identifier: string;
+  identifier?: string;
   code: string;
-  purpose: "change_email" | "change_phone";
+  purpose: "change_email" | "verify_phone" | "change_phone";
+  phone?: string;
 }

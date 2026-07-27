@@ -4,8 +4,8 @@ import { useEffect, useState, ReactNode } from "react"
 import { useQuery, useQueryClient } from "@tanstack/react-query"
 import { getAccessToken, clearTokens } from "@/lib/utils/tokenManager"
 import { useAuthStore } from "@/lib/store/useAuthStore"
-import authService from "@/lib/services/auth.service"
 import { UserProfile } from "@/lib/types"
+import userService from "../services/user.service"
 
 export default function AuthProvider({ children }: { children: ReactNode }) {
   const queryClient = useQueryClient()
@@ -21,7 +21,7 @@ export default function AuthProvider({ children }: { children: ReactNode }) {
   const { data: profile, error, isSuccess } = useQuery<UserProfile>({
     queryKey: ["userProfile"],
     queryFn: async () => {
-      const data = await authService.getProfile();
+      const data = await userService.getProfile();
       return data.data;
     },
     enabled: hasToken,

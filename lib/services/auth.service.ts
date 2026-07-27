@@ -9,16 +9,6 @@ import {
   CompleteRegisterRequest,
   ForgotPasswordResponse,
   ResetPasswordRequest,
-  UserProfile,
-  UpdateProfileRequest,
-  EmailLinkPurpose,
-  ConfirmEmailLinkResponse,
-  ChangeEmailRequest,
-  ChangeEmailConfirmRequest,
-  ChangeEmailConfirmResponse,
-  ChangePhoneVerifyResponse,
-  SendAccountOtpRequest,
-  VerifyAccountOtpRequest,
 } from "@/lib/types";
 
 export const authService = {
@@ -72,84 +62,6 @@ export const authService = {
   logout: async (refreshToken: string): Promise<ApiResponse<null>> => {
     const res = await httpClient.post(ENDPOINT.AUTH.LOGOUT, { refresh_token: refreshToken });
     return res.data;
-  },
-
-  getProfile: async (): Promise<ApiResponse<UserProfile>> => {
-    const res = await httpClient.get(ENDPOINT.USER.GET_PROFILE);
-    return res.data;
-  },
-
-  updateProfile: async (data: UpdateProfileRequest): Promise<ApiResponse<UserProfile>> => {
-    const res = await httpClient.post(ENDPOINT.USER.UPDATE_PROFILE, data);
-    return res.data;
-  },
-
-  requestEmailLink: async (
-    email: string,
-    purpose: EmailLinkPurpose = "verify_new"
-  ): Promise<ApiResponse<null>> => {
-    const res = await httpClient.post(ENDPOINT.USER.VERIFY_EMAIL, { email, purpose });
-    return res.data;
-  },
-
-  confirmEmailLink: async (token: string): Promise<ApiResponse<ConfirmEmailLinkResponse | null>> => {
-    const res = await httpClient.get(`${ENDPOINT.USER.VERIFY_EMAIL_CONFIRM}?token=${encodeURIComponent(token)}`);
-    return res.data;
-  },
-
-  changeEmail: async (data: ChangeEmailRequest): Promise<ApiResponse<null>> => {
-    const res = await httpClient.post(ENDPOINT.USER.CHANGE_EMAIL, {
-      identifier: data.identifier,
-      change_email_token: data.change_email_token,
-    });
-    return res.data;
-  },
-
-  changeEmailConfirm: async (data: ChangeEmailConfirmRequest): Promise<ApiResponse<ChangeEmailConfirmResponse | null>> => {
-    const res = await httpClient.post(ENDPOINT.USER.CHANGE_EMAIL_CONFIRM, {
-      identifier: data.identifier,
-      code: data.code,
-    });
-    return res.data;
-  },
-
-  changePhone: async (phone: string): Promise<ApiResponse<null>> => {
-    const res = await httpClient.post(ENDPOINT.USER.CHANGE_PHONE, { phone });
-    return res.data;
-  },
-
-  changePhoneVerify: async (phone: string, code: string): Promise<ApiResponse<ChangePhoneVerifyResponse | null>> => {
-    const res = await httpClient.post(ENDPOINT.USER.CHANGE_PHONE_VERIFY, { phone, code });
-    return res.data;
-  },
-
-  // Backward-compatible helpers for account OTP workflows
-  sendAccountOtp: async (data: SendAccountOtpRequest): Promise<ApiResponse<null>> => {
-    if (data.purpose === "change_email") {
-      return authService.changeEmail({
-        identifier: data.identifier,
-        change_email_token: data.change_email_token || "",
-      });
-    }
-    return authService.changePhone(data.identifier);
-  },
-
-  verifyAccountOtp: async (data: VerifyAccountOtpRequest): Promise<ApiResponse<ChangeEmailConfirmResponse | ChangePhoneVerifyResponse | null>> => {
-    if (data.purpose === "change_email") {
-      return authService.changeEmailConfirm({
-        identifier: data.identifier,
-        code: data.code,
-      });
-    }
-    return authService.changePhoneVerify(data.identifier, data.code);
-  },
-
-  requestChangeEmail: async (email: string) => {
-    return authService.requestEmailLink(email, "verify_current");
-  },
-
-  verifyEmailToken: async (token: string) => {
-    return authService.confirmEmailLink(token);
   },
 };
 

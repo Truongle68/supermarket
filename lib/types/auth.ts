@@ -14,12 +14,12 @@ export interface CheckUsernameResponse {
 }
 
 export interface RequestOTPRequest {
-  identifier: string;
+  identifier?: string;
   phone?: string;
 }
 
 export interface VerifyOTPRequest {
-  identifier: string;
+  identifier?: string;
   phone?: string;
   otp_code: string;
 }
@@ -27,7 +27,7 @@ export interface VerifyOTPRequest {
 export interface VerifyOTPResponse {
   verify_otp_token: string;
   user_exists: boolean;
-  username?: string;
+  username: string;
 }
 
 export interface CompleteRegisterRequest {

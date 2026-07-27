@@ -12,20 +12,27 @@ export const ENDPOINT = {
     LOGOUT: "/auth/logout",
   },
   USER: {
-    GET_PROFILE: "/users/get-profile",
-    UPDATE_PROFILE: "/users/update-profile",
+    PROFILE: "/users/profile",
     VERIFY_EMAIL: "/users/verify-email",
     VERIFY_EMAIL_CONFIRM: "/users/verify-email/confirm",
     CHANGE_EMAIL: "/users/change-email",
     CHANGE_EMAIL_CONFIRM: "/users/change-email/confirm",
+    VERIFY_PHONE: "/users/verify-phone",
+    VERIFY_PHONE_CONFIRM: "/users/verify-phone/confirm",
     CHANGE_PHONE: "/users/change-phone",
-    CHANGE_PHONE_VERIFY: "/users/change-phone/verify",
-    ADDRESS: {
-      GET_LIST: "/users/address/get-address-list",
-      CREATE: "/users/address/create-address",
-      SET_DEFAULT: "/users/address/set-default-address",
-      UPDATE: "/users/address/update-address",
-      DELETE: "/users/address/delete-address"
-    }
+    CHANGE_PHONE_CONFIRM: "/users/change-phone/confirm",
+    ADDRESSES: "/users/addresses",
+    ADDRESS_SET_DEFAULT: (id: string) => `/users/addresses/${id}/set-default`,
+    ADDRESS_UPDATE: (id: string) => `/users/addresses/${id}/update`,
+    ADDRESS_DELETE: (id: string) => `/users/addresses/${id}/delete`,
+  },
+  CATALOG: {
+    CATEGORIES: "/categories",
+    CATEGORY_BY_ID: (id: string) => `/categories/${id}`,
+    CATEGORY_CHILDREN: (id: string) => `/categories/${id}/children`,
+    CATEGORY_PRODUCTS: (id: string) => `/categories/${id}/products`,
+    PRODUCTS: "/products",
+    PRODUCT_BY_ID: (id: string) => `/products/${id}`,
+    PRODUCT_SEARCH: "/products/search",
   },
 } as const;

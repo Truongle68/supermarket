@@ -26,7 +26,6 @@ export interface CreateAddressRequest {
 }
 
 export interface UpdateAddressRequest {
-  id: string;
   label?: AddressLabel;
   address_line?: string;
   ward?: string;
@@ -34,12 +33,4 @@ export interface UpdateAddressRequest {
   city?: string;
   lat?: number;
   lng?: number;
-}
-
-export interface SetDefaultAddressRequest {
-  id: string;
-}
-
-export interface DeleteAddressRequest {
-  id: string;
 }
