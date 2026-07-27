@@ -12,10 +12,6 @@ interface ProductModalProps {
   categories: string[]
 }
 
-const EMOJI_OPTIONS = ["🥦", "🍅", "🥬", "🍎", "🥑", "🥩", "🥚", "🥤", "🧂", "🌽", "🍊", "🥕", "🍇", "🧀", "🍞", "🌾", "🥛", "🍯", "🐟", "🍇"]
-const BADGE_OPTIONS = ["", "Khuyến mãi", "Hái mới", "Bán chạy", "Đặc biệt"]
-const UNIT_OPTIONS = ["kg", "hộp 500g", "khay 500g", "bó", "hộp 10 quả", "chai 500ml", "gói", "túi 1kg"]
-
 export function ProductModal({
   isOpen,
   onClose,
@@ -28,9 +24,8 @@ export function ProductModal({
   const [price, setPrice] = useState("")
   const [originalPrice, setOriginalPrice] = useState("")
   const [stock, setStock] = useState("")
-  const [unit, setUnit] = useState("kg")
-  const [customUnit, setCustomUnit] = useState("")
-  const [image, setImage] = useState("🥦")
+  const [unit, setUnit] = useState("")
+  const [image, setImage] = useState("")
   const [badge, setBadge] = useState("")
   const [status, setStatus] = useState<'active' | 'out_of_stock' | 'hidden'>("active")
   const [description, setDescription] = useState("")
@@ -43,16 +38,8 @@ export function ProductModal({
       setPrice(initialData.price ? String(initialData.price) : "")
       setOriginalPrice(initialData.originalPrice ? String(initialData.originalPrice) : "")
       setStock(initialData.stock !== undefined ? String(initialData.stock) : "")
-      
-      if (UNIT_OPTIONS.includes(initialData.unit)) {
-        setUnit(initialData.unit)
-        setCustomUnit("")
-      } else {
-        setUnit("custom")
-        setCustomUnit(initialData.unit || "")
-      }
-
-      setImage(initialData.image || "🥦")
+      setUnit(initialData.unit || "")
+      setImage(initialData.image || "")
       setBadge(initialData.badge || "")
       setStatus(initialData.status || "active")
       setDescription(initialData.description || "")
@@ -61,10 +48,9 @@ export function ProductModal({
       setCategory(categories[0] || "")
       setPrice("")
       setOriginalPrice("")
-      setStock("20")
-      setUnit("kg")
-      setCustomUnit("")
-      setImage("🥦")
+      setStock("")
+      setUnit("")
+      setImage("")
       setBadge("")
       setStatus("active")
       setDescription("")
@@ -87,7 +73,7 @@ export function ProductModal({
     if (stock === "" || isNaN(Number(stock)) || Number(stock) < 0) {
       newErrors.stock = "Tồn kho phải là số không âm"
     }
-    if (unit === "custom" && !customUnit.trim()) {
+    if (!unit.trim()) {
       newErrors.unit = "Vui lòng nhập đơn vị tính"
     }
     setErrors(newErrors)
@@ -98,7 +84,6 @@ export function ProductModal({
     e.preventDefault()
     if (!validate()) return
 
-    const finalUnit = unit === "custom" ? customUnit.trim() : unit
     const numPrice = Number(price)
     const numOriginal = originalPrice ? Number(originalPrice) : numPrice
     const numStock = Number(stock)
@@ -114,9 +99,9 @@ export function ProductModal({
       price: numPrice,
       originalPrice: numOriginal,
       stock: numStock,
-      unit: finalUnit,
-      image,
-      badge,
+      unit: unit.trim(),
+      image: image.trim(),
+      badge: badge.trim(),
       status: autoStatus,
       description: description.trim()
     })
@@ -166,7 +151,7 @@ export function ProductModal({
                 type="text"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
-                placeholder="VD: Cà chua bi hữu cơ..."
+                placeholder="Nhập tên sản phẩm..."
                 className={`w-full px-3.5 py-2.5 bg-[#FDFBF7] border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 transition-all ${
                   errors.name ? "border-rose-500 focus:ring-rose-200" : "border-[#C6C0B0] focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2]"
                 }`}
@@ -183,9 +168,13 @@ export function ProductModal({
                 onChange={(e) => setCategory(e.target.value)}
                 className="w-full px-3.5 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2] transition-all cursor-pointer"
               >
-                {categories.map((cat) => (
-                  <option key={cat} value={cat}>{cat}</option>
-                ))}
+                {categories.length > 0 ? (
+                  categories.map((cat) => (
+                    <option key={cat} value={cat}>{cat}</option>
+                  ))
+                ) : (
+                  <option value="">Chưa có danh mục</option>
+                )}
               </select>
             </div>
           </div>
@@ -200,7 +189,7 @@ export function ProductModal({
                 type="number"
                 value={price}
                 onChange={(e) => setPrice(e.target.value)}
-                placeholder="VD: 45000"
+                placeholder="Nhập giá bán..."
                 className={`w-full px-3.5 py-2.5 bg-[#FDFBF7] border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 transition-all ${
                   errors.price ? "border-rose-500 focus:ring-rose-200" : "border-[#C6C0B0] focus:ring-emerald-500/20 focus:border-emerald-600"
                 }`}
@@ -221,7 +210,7 @@ export function ProductModal({
                 type="number"
                 value={originalPrice}
                 onChange={(e) => setOriginalPrice(e.target.value)}
-                placeholder="VD: 60000 (để trống nếu không giảm giá)"
+                placeholder="Để trống nếu không giảm giá..."
                 className="w-full px-3.5 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2] transition-all"
               />
               {originalPrice && !isNaN(Number(originalPrice)) && (
@@ -242,7 +231,7 @@ export function ProductModal({
                 type="number"
                 value={stock}
                 onChange={(e) => setStock(e.target.value)}
-                placeholder="VD: 50"
+                placeholder="Nhập số lượng tồn kho..."
                 className={`w-full px-3.5 py-2.5 bg-[#FDFBF7] border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 transition-all ${
                   errors.stock ? "border-rose-500 focus:ring-rose-200" : "border-[#C6C0B0] focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2]"
                 }`}
@@ -252,73 +241,62 @@ export function ProductModal({
 
             <div>
               <label className="block text-xs font-bold text-[#1E2522] mb-1.5">Đơn vị tính *</label>
-              <div className="grid grid-cols-2 gap-2">
-                <select
-                  value={unit}
-                  onChange={(e) => setUnit(e.target.value)}
-                  className="px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20 cursor-pointer"
-                >
-                  {UNIT_OPTIONS.map((u) => (
-                    <option key={u} value={u}>{u}</option>
-                  ))}
-                  <option value="custom">Khác (tự nhập)...</option>
-                </select>
-
-                {unit === "custom" ? (
-                  <input
-                    type="text"
-                    value={customUnit}
-                    onChange={(e) => setCustomUnit(e.target.value)}
-                    placeholder="VD: chai 1L"
-                    className="px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20"
-                  />
-                ) : (
-                  <div className="flex items-center px-3 py-2.5 bg-slate-100 border border-slate-200 rounded-xl text-xs text-slate-500 font-bold">
-                    Đã chọn: {unit}
-                  </div>
-                )}
-              </div>
+              <input
+                type="text"
+                value={unit}
+                onChange={(e) => setUnit(e.target.value)}
+                placeholder="Nhập đơn vị tính (VD: kg, hộp, chai, gói...)"
+                className={`w-full px-3.5 py-2.5 bg-[#FDFBF7] border rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 transition-all ${
+                  errors.unit ? "border-rose-500 focus:ring-rose-200" : "border-[#C6C0B0] focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2]"
+                }`}
+              />
+              {errors.unit && <p className="text-2xs text-rose-600 font-bold mt-1">{errors.unit}</p>}
             </div>
           </div>
 
-          {/* Row 4: Emoji & Badge */}
+          {/* Row 4: Image & Badge */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-bold text-[#1E2522] mb-1.5 flex items-center gap-1">
-                <ImageIcon className="w-3.5 h-3.5 text-[#1DA1F2]" /> Biểu tượng / Emoji đại diện
+                <ImageIcon className="w-3.5 h-3.5 text-[#1DA1F2]" /> Hình ảnh / Biểu tượng sản phẩm
               </label>
               <div className="flex items-center gap-2">
-                <div className="h-11 w-11 rounded-xl bg-amber-50 border border-amber-200 flex items-center justify-center text-2xl shrink-0 shadow-sm">
-                  {image}
+                <div className="h-10 w-10 rounded-xl bg-slate-50 border border-slate-200 flex items-center justify-center text-xl shrink-0 shadow-sm overflow-hidden text-slate-400">
+                  {image && image.trim() ? (
+                    image.trim().length <= 4 ? (
+                      image.trim()
+                    ) : (
+                      /* eslint-disable-next-line @next/next/no-img-element */
+                      <img
+                        src={(image.trim().startsWith("http://") || image.trim().startsWith("https://") || image.trim().startsWith("/")) ? image.trim() : `https://${image.trim()}`}
+                        alt="Preview"
+                        className="w-full h-full object-cover"
+                        onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none' }}
+                      />
+                    )
+                  ) : (
+                    <ImageIcon className="w-5 h-5 text-slate-300" />
+                  )}
                 </div>
-                <div className="flex-1 flex gap-1 overflow-x-auto p-1 bg-[#FDFBF7] border border-[#EBE6DA] rounded-xl">
-                  {EMOJI_OPTIONS.map((emoji) => (
-                    <button
-                      key={emoji}
-                      type="button"
-                      onClick={() => setImage(emoji)}
-                      className={`h-8 w-8 rounded-lg flex items-center justify-center text-base hover:bg-amber-100 transition-all shrink-0 cursor-pointer ${
-                        image === emoji ? "bg-amber-200 ring-2 ring-amber-400" : ""
-                      }`}
-                    >
-                      {emoji}
-                    </button>
-                  ))}
-                </div>
+                <input
+                  type="text"
+                  value={image}
+                  onChange={(e) => setImage(e.target.value)}
+                  placeholder="Nhập URL ảnh hoặc emoji..."
+                  className="flex-1 px-3.5 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2]"
+                />
               </div>
             </div>
 
             <div>
               <label className="block text-xs font-bold text-[#1E2522] mb-1.5">Nhãn nổi bật (Badge)</label>
-              <select
+              <input
+                type="text"
                 value={badge}
                 onChange={(e) => setBadge(e.target.value)}
-                className="w-full px-3.5 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2] cursor-pointer"
-              >
-                {BADGE_OPTIONS.map((b) => (
-                  <option key={b} value={b}>{b || "-- Không gắn nhãn --"}</option>
-                ))}
-              </select>
+                placeholder="Nhập nhãn (VD: Khuyến mãi, Bán chạy...)"
+                className="w-full px-3.5 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20 focus:border-[#1DA1F2]"
+              />
             </div>
           </div>
 
@@ -345,7 +323,7 @@ export function ProductModal({
                 value={description}
                 onChange={(e) => setDescription(e.target.value)}
                 rows={2}
-                placeholder="Mô tả về nguồn gốc, hương vị, hướng dẫn bảo quản..."
+                placeholder="Mô tả về nguồn gốc, bảo quản..."
                 className="w-full px-3.5 py-2 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl text-xs font-semibold focus:outline-none focus:ring-2 focus:ring-[#1DA1F2]/20"
               />
             </div>

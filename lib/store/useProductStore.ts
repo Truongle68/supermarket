@@ -1,11 +1,29 @@
 import { create } from 'zustand'
 import { persist } from 'zustand/middleware'
+import catalogService from '@/lib/services/catalog.service'
+import {
+  Category,
+  CatalogProduct,
+  CreateProductRequest,
+  UpdateProductRequest,
+  ListProductsQuery,
+  SearchProductsQuery,
+} from '@/lib/types'
+import {
+  generateProductId,
+  generateSKU,
+  formatDateISO,
+  normalizeImageUrl
+} from '@/lib/utils'
 
 export interface Product {
   id: string
   sku: string
   name: string
+  nameVi?: string
+  nameEn?: string
   category: string
+  categoryId?: string
   price: number
   originalPrice: number
   stock: number
@@ -14,228 +32,296 @@ export interface Product {
   badge: string
   status: 'active' | 'out_of_stock' | 'hidden'
   description?: string
+  descriptionVi?: string
+  descriptionEn?: string
   salesCount: number
   createdAt: string
+}
+
+export function mapCatalogProductToFrontend(
+  bp: CatalogProduct,
+  categoriesMap?: Record<string, string>
+): Product {
+  const categoryName = categoriesMap?.[bp.category_id] || bp.category_id || ""
+  const isSale = bp.sale_price < bp.base_price
+  const imageUrl = normalizeImageUrl(bp.images?.[0]?.url)
+
+  return {
+    id: bp.id,
+    sku: bp.sku,
+    name: bp.name_vi || bp.name_en || "",
+    nameVi: bp.name_vi || "",
+    nameEn: bp.name_en || "",
+    category: categoryName,
+    categoryId: bp.category_id,
+    price: bp.sale_price || bp.base_price || 0,
+    originalPrice: bp.base_price || bp.sale_price || 0,
+    stock: 0,
+    unit: bp.unit || "",
+    image: imageUrl,
+    badge: isSale ? "Khuyến mãi" : "",
+    status: bp.is_active ? "active" : "hidden",
+    description: bp.description_vi || bp.description_en || "",
+    descriptionVi: bp.description_vi || "",
+    descriptionEn: bp.description_en || "",
+    salesCount: bp.rating_count || 0,
+    createdAt: formatDateISO(bp.created_at),
+  }
 }
 
 interface ProductStore {
   products: Product[]
   categories: string[]
-  addProduct: (product: Omit<Product, 'id' | 'sku' | 'salesCount' | 'createdAt'>) => void
+  apiCategories: Category[]
+  isLoading: boolean
+  error: string | null
+
+  // Synchronous / Local Actions
+  addProduct: (product: Omit<Product, 'id' | 'salesCount' | 'createdAt'>) => void
   updateProduct: (id: string, productData: Partial<Product>) => void
   deleteProduct: (id: string) => void
   toggleProductStatus: (id: string) => void
+
+  // Async API Actions
+  fetchCategoriesFromApi: () => Promise<Category[]>
+  fetchProductsFromApi: (params?: ListProductsQuery) => Promise<Product[]>
+  searchProductsFromApi: (params?: SearchProductsQuery) => Promise<Product[]>
+  createProductApi: (data: CreateProductRequest) => Promise<CatalogProduct | null>
+  updateProductApi: (id: string, data: UpdateProductRequest) => Promise<CatalogProduct | null>
+  deleteProductApi: (id: string) => Promise<boolean>
 }
 
-const INITIAL_CATEGORIES = [
-  "Rau củ hữu cơ",
-  "Trái cây tươi",
-  "Thịt & Thủy sản",
-  "Sữa & Trứng",
-  "Đồ uống & Trà",
-  "Gia vị & Khô"
-]
+const INITIAL_CATEGORIES: string[] = []
 
-const INITIAL_PRODUCTS: Product[] = [
-  {
-    id: "PROD-001",
-    sku: "SKU-89301",
-    name: "Bơ sáp Đắc Lắk",
-    category: "Trái cây tươi",
-    price: 45000,
-    originalPrice: 60000,
-    stock: 42,
-    unit: "kg",
-    image: "🥑",
-    badge: "Khuyến mãi",
-    status: "active",
-    description: "Bơ sáp dẻo ngậy, hái tại vườn Đắk Lắk, không sử dụng thuốc bảo vệ thực vật.",
-    salesCount: 156,
-    createdAt: "2026-07-01"
-  },
-  {
-    id: "PROD-002",
-    sku: "SKU-89302",
-    name: "Cà chua bi hữu cơ",
-    category: "Rau củ hữu cơ",
-    price: 28000,
-    originalPrice: 35000,
-    stock: 18,
-    unit: "hộp 500g",
-    image: "🍅",
-    badge: "Hái mới",
-    status: "active",
-    description: "Cà chua bi giòn ngọt chuẩn hữu cơ Đà Lạt.",
-    salesCount: 230,
-    createdAt: "2026-07-05"
-  },
-  {
-    id: "PROD-003",
-    sku: "SKU-89303",
-    name: "Rau muống nước sạch",
-    category: "Rau củ hữu cơ",
-    price: 12000,
-    originalPrice: 15000,
-    stock: 5,
-    unit: "bó",
-    image: "🥬",
-    badge: "Bán chạy",
-    status: "active",
-    description: "Rau muống thủy canh sạch, cọng mập giòn.",
-    salesCount: 410,
-    createdAt: "2026-07-10"
-  },
-  {
-    id: "PROD-004",
-    sku: "SKU-89304",
-    name: "Táo Envy nhập khẩu",
-    category: "Trái cây tươi",
-    price: 89000,
-    originalPrice: 110000,
-    stock: 0,
-    unit: "kg",
-    image: "🍎",
-    badge: "Đặc biệt",
-    status: "out_of_stock",
-    description: "Táo Envy New Zealand nhập khẩu chuẩn ngạch, ngọt đậm đậm đà.",
-    salesCount: 98,
-    createdAt: "2026-07-08"
-  },
-  {
-    id: "PROD-005",
-    sku: "SKU-89305",
-    name: "Thịt ba chỉ bò Mỹ",
-    category: "Thịt & Thủy sản",
-    price: 135000,
-    originalPrice: 160000,
-    stock: 25,
-    unit: "khay 500g",
-    image: "🥩",
-    badge: "Khuyến mãi",
-    status: "active",
-    description: "Thịt ba chỉ bò Mỹ đông lạnh cắt lát mỏng thích hợp ăn lẩu, nướng.",
-    salesCount: 185,
-    createdAt: "2026-07-12"
-  },
-  {
-    id: "PROD-006",
-    sku: "SKU-89306",
-    name: "Trứng gà tươi OMEGA-3",
-    category: "Sữa & Trứng",
-    price: 38000,
-    originalPrice: 42000,
-    stock: 60,
-    unit: "hộp 10 quả",
-    image: "🥚",
-    badge: "Bán chạy",
-    status: "active",
-    description: "Trứng gà nuôi thảo dược giàu Omega 3 và các vi chất dinh dưỡng.",
-    salesCount: 320,
-    createdAt: "2026-07-15"
-  },
-  {
-    id: "PROD-007",
-    sku: "SKU-89307",
-    name: "Trà sữa Ô Long kem béo",
-    category: "Đồ uống & Trà",
-    price: 32000,
-    originalPrice: 40000,
-    stock: 0,
-    unit: "chai 500ml",
-    image: "🥤",
-    badge: "",
-    status: "out_of_stock",
-    description: "Trà sữa đóng chai tươi trong ngày đậm vị trà Ô Long Lâm Đồng.",
-    salesCount: 142,
-    createdAt: "2026-07-14"
-  },
-  {
-    id: "PROD-008",
-    sku: "SKU-89308",
-    name: "Nước mắm cá cơm Phú Quốc",
-    category: "Gia vị & Khô",
-    price: 75000,
-    originalPrice: 85000,
-    stock: 12,
-    unit: "chai 500ml",
-    image: "🧂",
-    badge: "Đặc biệt",
-    status: "active",
-    description: "Nước mắm truyền thống 40 độ đạm nguyên chất đậm đà.",
-    salesCount: 88,
-    createdAt: "2026-07-02"
-  }
-]
+const INITIAL_PRODUCTS: Product[] = []
 
 export const useProductStore = create<ProductStore>()(
   persist(
-    (set) => ({
+    (set, get) => ({
       products: INITIAL_PRODUCTS,
       categories: INITIAL_CATEGORIES,
+      apiCategories: [],
+      isLoading: false,
+      error: null,
 
-      addProduct: (newProductData) => {
+      addProduct: (newProductData, apiCategoryId?: string) => {
+        const productSku = newProductData.sku?.trim() || generateSKU()
+        const primaryName = newProductData.nameVi || newProductData.name || newProductData.nameEn || ""
+
         set((state) => {
-          const newIdNumber = state.products.length + 1
-          const id = `PROD-${String(newIdNumber).padStart(3, '0')}`
-          const sku = `SKU-${Math.floor(10000 + Math.random() * 90000)}`
-          
+          const id = generateProductId(state.products.length + 1)
           const newProduct: Product = {
             ...newProductData,
+            name: primaryName,
             id,
-            sku,
+            sku: productSku,
             salesCount: 0,
-            createdAt: new Date().toISOString().split('T')[0]
+            createdAt: formatDateISO()
           }
 
           return {
             products: [newProduct, ...state.products]
           }
         })
+
+        // Also trigger API create in background if category ID is available
+        const catId = apiCategoryId || get().apiCategories.find(c => c.name_vi === newProductData.category || c.name_en === newProductData.category)?.id
+        if (catId) {
+          get().createProductApi({
+            category_id: catId,
+            sku: productSku,
+            name_vi: newProductData.nameVi || primaryName,
+            name_en: newProductData.nameEn || primaryName,
+            description_vi: newProductData.descriptionVi || newProductData.description || "",
+            description_en: newProductData.descriptionEn || newProductData.description || "",
+            unit: newProductData.unit,
+            base_price: newProductData.originalPrice || newProductData.price,
+            sale_price: newProductData.price,
+            is_active: newProductData.status === 'active',
+            images: newProductData.image ? [{ url: newProductData.image, sort_order: 1 }] : []
+          }).catch(console.error)
+        }
       },
 
-      updateProduct: (id, updatedFields) => {
+      updateProduct: (id, updatedFields, apiCategoryId?: string) => {
         set((state) => ({
           products: state.products.map((item) => {
             if (item.id === id) {
               const updatedStock = updatedFields.stock !== undefined ? updatedFields.stock : item.stock
               let autoStatus = updatedFields.status || item.status
-              
-              // Auto-sync out_of_stock status if stock drops to 0
+
               if (updatedStock === 0 && autoStatus === 'active') {
                 autoStatus = 'out_of_stock'
               } else if (updatedStock > 0 && autoStatus === 'out_of_stock') {
                 autoStatus = 'active'
               }
 
+              const primaryName = updatedFields.nameVi || updatedFields.name || updatedFields.nameEn || item.name
+
               return {
                 ...item,
                 ...updatedFields,
+                name: primaryName,
                 status: autoStatus
               }
             }
             return item
           })
         }))
+
+        // Also trigger API update if this is an API product (UUID length > 10)
+        if (id.length > 10) {
+          const targetCategory = apiCategoryId || get().apiCategories.find(c => c.name_vi === updatedFields.category || c.name_en === updatedFields.category)?.id
+          const payload: UpdateProductRequest = {}
+          if (updatedFields.nameVi || updatedFields.name) payload.name_vi = updatedFields.nameVi || updatedFields.name;
+          if (updatedFields.nameEn || updatedFields.name) payload.name_en = updatedFields.nameEn || updatedFields.name;
+          if (updatedFields.descriptionVi || updatedFields.description) payload.description_vi = updatedFields.descriptionVi || updatedFields.description;
+          if (updatedFields.descriptionEn || updatedFields.description) payload.description_en = updatedFields.descriptionEn || updatedFields.description;
+          if (updatedFields.sku) payload.sku = updatedFields.sku;
+          if (updatedFields.price !== undefined) payload.sale_price = updatedFields.price;
+          if (updatedFields.originalPrice !== undefined) payload.base_price = updatedFields.originalPrice;
+          if (updatedFields.unit !== undefined) payload.unit = updatedFields.unit;
+          if (updatedFields.status !== undefined) payload.is_active = updatedFields.status === 'active';
+          if (targetCategory) payload.category_id = targetCategory;
+          if (updatedFields.image) payload.images = [{ url: updatedFields.image, sort_order: 1 }];
+
+          if (Object.keys(payload).length > 0) {
+            get().updateProductApi(id, payload).catch(console.error)
+          }
+        }
       },
 
       deleteProduct: (id) => {
         set((state) => ({
           products: state.products.filter((item) => item.id !== id)
         }))
+
+        if (id.length > 10) {
+          get().deleteProductApi(id).catch(console.error)
+        }
       },
 
       toggleProductStatus: (id) => {
         set((state) => ({
           products: state.products.map((item) => {
             if (item.id === id) {
-              const nextStatus = item.status === 'active' 
+              const nextStatus = item.status === 'active'
                 ? (item.stock === 0 ? 'out_of_stock' : 'hidden')
                 : (item.status === 'hidden' ? (item.stock === 0 ? 'out_of_stock' : 'active') : 'active')
+
+              if (id.length > 10) {
+                get().updateProductApi(id, { is_active: nextStatus === 'active' }).catch(console.error)
+              }
+
               return { ...item, status: nextStatus }
             }
             return item
           })
         }))
+      },
+
+      // API Actions
+      fetchCategoriesFromApi: async () => {
+        set({ isLoading: true, error: null })
+        try {
+          const res = await catalogService.listCategories()
+          if (res.success && res.data) {
+            const catNames = res.data.map(c => c.name_vi || c.name_en)
+            set({
+              apiCategories: res.data,
+              categories: Array.from(new Set([...catNames, ...get().categories])),
+              isLoading: false
+            })
+            return res.data
+          }
+        } catch (err: any) {
+          set({ error: err.message || 'Failed to fetch categories', isLoading: false })
+        }
+        return []
+      },
+
+      fetchProductsFromApi: async (params?: ListProductsQuery) => {
+        set({ isLoading: true, error: null })
+        try {
+          const currentApiCats = get().apiCategories
+          const res = await catalogService.listProducts(params)
+          if (res.success && res.data) {
+            const catMap: Record<string, string> = {}
+            currentApiCats.forEach(c => { catMap[c.id] = c.name_vi || c.name_en })
+            const mappedProducts = res.data.map(p => mapCatalogProductToFrontend(p, catMap))
+            set({ products: mappedProducts, isLoading: false })
+            return mappedProducts
+          }
+        } catch (err: any) {
+          set({ error: err.message || 'Failed to fetch products', isLoading: false })
+        }
+        return []
+      },
+
+      searchProductsFromApi: async (params?: SearchProductsQuery) => {
+        set({ isLoading: true, error: null })
+        try {
+          let currentApiCats = get().apiCategories
+          if (currentApiCats.length === 0) {
+            currentApiCats = await get().fetchCategoriesFromApi()
+          }
+          const res = await catalogService.searchProducts(params)
+          if (res.success && res.data?.products) {
+            const catMap: Record<string, string> = {}
+            currentApiCats.forEach(c => { catMap[c.id] = c.name_vi || c.name_en })
+            const mappedProducts = res.data.products.map(p => mapCatalogProductToFrontend(p, catMap))
+            set({ products: mappedProducts, isLoading: false })
+            return mappedProducts
+          }
+        } catch (err: any) {
+          set({ error: err.message || 'Failed to search products', isLoading: false })
+        }
+        return []
+      },
+
+      createProductApi: async (data: CreateProductRequest) => {
+        set({ isLoading: true, error: null })
+        try {
+          const res = await catalogService.createProduct(data)
+          if (res.success && res.data) {
+            set({ isLoading: false })
+            await get().fetchProductsFromApi()
+            return res.data
+          }
+        } catch (err: any) {
+          set({ error: err.message || 'Failed to create product', isLoading: false })
+        }
+        return null
+      },
+
+      updateProductApi: async (id: string, data: UpdateProductRequest) => {
+        set({ isLoading: true, error: null })
+        try {
+          const res = await catalogService.updateProduct(id, data)
+          if (res.success && res.data) {
+            set({ isLoading: false })
+            await get().fetchProductsFromApi()
+            return res.data
+          }
+        } catch (err: any) {
+          set({ error: err.message || 'Failed to update product', isLoading: false })
+        }
+        return null
+      },
+
+      deleteProductApi: async (id: string) => {
+        set({ isLoading: true, error: null })
+        try {
+          const res = await catalogService.deleteProduct(id)
+          if (res.success) {
+            set({ isLoading: false })
+            await get().fetchProductsFromApi()
+            return true
+          }
+        } catch (err: any) {
+          set({ error: err.message || 'Failed to delete product', isLoading: false })
+        }
+        return false
       }
     }),
     {

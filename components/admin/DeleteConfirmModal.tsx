@@ -1,7 +1,7 @@
 'use client'
 
 import { Product } from "@/lib/store/useProductStore"
-import { AlertTriangle, Trash2, X } from "lucide-react"
+import { AlertTriangle, Trash2, X, Package } from "lucide-react"
 
 interface DeleteConfirmModalProps {
   isOpen: boolean
@@ -35,8 +35,22 @@ export function DeleteConfirmModal({
 
         {/* Product Card Preview */}
         <div className="mt-4 p-3.5 bg-slate-50 border border-slate-200 rounded-xl flex items-center gap-3 text-left">
-          <span className="text-2xl h-10 w-10 bg-amber-50 rounded-lg flex items-center justify-center shrink-0 border border-amber-200">
-            {product.image}
+          <span className="text-2xl h-10 w-10 bg-slate-100 rounded-lg flex items-center justify-center shrink-0 border border-slate-200 overflow-hidden text-slate-400">
+            {product.image && product.image.trim() ? (
+              product.image.trim().length <= 4 ? (
+                product.image.trim()
+              ) : (
+                /* eslint-disable-next-line @next/next/no-img-element */
+                <img
+                  src={(product.image.trim().startsWith("http://") || product.image.trim().startsWith("https://") || product.image.trim().startsWith("/")) ? product.image.trim() : `https://${product.image.trim()}`}
+                  alt={product.name}
+                  className="w-full h-full object-cover"
+                  onError={(e) => { (e.currentTarget as HTMLElement).style.display = 'none' }}
+                />
+              )
+            ) : (
+              <Package className="w-5 h-5 text-slate-400" />
+            )}
           </span>
           <div className="min-w-0 flex-1">
             <h4 className="text-xs font-extrabold text-[#16422F] truncate">{product.name}</h4>
