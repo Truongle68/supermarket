@@ -5,6 +5,8 @@ import Link from "next/link"
 import { useRouter } from "next/navigation"
 import { useAuth } from "@/lib/store/useAuthStore"
 import { userService } from "@/lib/services/user.service"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 import locationService from "@/lib/services/location.service"
 import { Address, AddressLabel } from "@/lib/types"
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query"
@@ -58,14 +60,12 @@ export default function ProfilePage() {
   const [address, setAddress] = useState("")
   const [gender, setGender] = useState("")
   const [dob, setDob] = useState("")
-  const [successMsg, setSuccessMsg] = useState("")
 
   // Password fields state
   const [currentPassword, setCurrentPassword] = useState("")
   const [newPassword, setNewPassword] = useState("")
   const [confirmNewPassword, setConfirmNewPassword] = useState("")
   const [passwordError, setPasswordError] = useState("")
-  const [passwordSuccess, setPasswordSuccess] = useState("")
   const [passwordLoading, setPasswordLoading] = useState(false)
 
   // Change Email Modal State
@@ -80,6 +80,24 @@ export default function ProfilePage() {
   const [phoneModalError, setPhoneModalError] = useState("")
   const [phoneModalSuccess, setPhoneModalSuccess] = useState("")
   const [phoneModalLoading, setPhoneModalLoading] = useState(false)
+
+  // Cooldown timers (60s)
+  const [phoneCooldown, setPhoneCooldown] = useState(0)
+  const [emailCooldown, setEmailCooldown] = useState(0)
+
+  useEffect(() => {
+    if (phoneCooldown > 0) {
+      const timer = setTimeout(() => setPhoneCooldown(phoneCooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [phoneCooldown])
+
+  useEffect(() => {
+    if (emailCooldown > 0) {
+      const timer = setTimeout(() => setEmailCooldown(emailCooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [emailCooldown])
 
   // Address Services Integration
   const { data: addressListRes, isLoading: addressLoading } = useQuery({
@@ -200,26 +218,36 @@ export default function ProfilePage() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["userAddresses"] })
       setShowAddressModal(false)
-      setSuccessMsg(editingAddress ? "Đã cập nhật địa chỉ thành công!" : "Đã thêm địa chỉ mới thành công!")
-      setTimeout(() => setSuccessMsg(""), 3000)
+      const msg = editingAddress ? "Đã cập nhật địa chỉ thành công!" : "Đã thêm địa chỉ mới thành công!"
+      toast.success(msg)
     },
     onError: (err: any) => {
-      setAddrFormError(err.response?.data?.message || err.message || "Có lỗi xảy ra khi lưu địa chỉ.")
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi lưu địa chỉ.")
+      toast.error(msg)
+      setAddrFormError(msg)
     },
   })
 
   const setDefaultAddressMutation = useMutation({
     mutationFn: (id: string) => userService.setDefaultAddress(id),
     onSuccess: () => {
+      toast.success("Đã đặt địa chỉ mặc định thành công!")
       queryClient.invalidateQueries({ queryKey: ["userAddresses"] })
     },
+    onError: (err: any) => {
+      toast.error(getVietnameseErrorMessage(err, "Không thể đặt địa chỉ mặc định."))
+    }
   })
 
   const deleteAddressMutation = useMutation({
     mutationFn: (id: string) => userService.deleteAddress(id),
     onSuccess: () => {
+      toast.success("Đã xóa địa chỉ thành công!")
       queryClient.invalidateQueries({ queryKey: ["userAddresses"] })
     },
+    onError: (err: any) => {
+      toast.error(getVietnameseErrorMessage(err, "Không thể xóa địa chỉ."))
+    }
   })
 
   // Change Phone Workflow Functions
@@ -229,10 +257,14 @@ export default function ProfilePage() {
     setPhoneModalLoading(true)
     try {
       await userService.verifyPhone()
+      setPhoneCooldown(60)
+      toast.success("Mã OTP xác thực đã được gửi tới số điện thoại của bạn!")
       setPhoneModalSuccess(`Mã OTP xác thực đã được gửi tới số điện thoại ${phone.trim()}.`)
       setPhoneStep(2)
     } catch (err: any) {
-      setPhoneModalError(err.response?.data?.message || err.message || "Có lỗi xảy ra khi gửi mã OTP.")
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi mã OTP.")
+      toast.error(msg)
+      setPhoneModalError(msg)
     } finally {
       setPhoneModalLoading(false)
     }
@@ -255,6 +287,7 @@ export default function ProfilePage() {
     try {
       const { data } = await userService.verifyPhoneConfirm(phoneOtpCode.trim())
       if (data?.change_phone_token) {
+        toast.success("Xác thực OTP thành công!")
         setPhoneModalSuccess("Xác thực thành công! Đang chuyển hướng...")
         setPhoneModalLoading(true)
         
@@ -265,7 +298,9 @@ export default function ProfilePage() {
         setPhoneModalLoading(false)
       }
     } catch (err: any) {
-      setPhoneModalError(err.response?.data?.message || err.message || "Mã OTP không đúng hoặc đã hết hạn.")
+      const msg = getVietnameseErrorMessage(err, "Mã OTP không đúng hoặc đã hết hạn.")
+      toast.error(msg)
+      setPhoneModalError(msg)
       setPhoneModalLoading(false)
     }
   }
@@ -321,11 +356,11 @@ export default function ProfilePage() {
         login({ ...user, name: data.full_name, phone: data.phone, email: data.email }, accessToken!, refreshToken!)
       }
       refetchProfile()
-      setSuccessMsg("Cập nhật thông tin hồ sơ thành công!")
-      setTimeout(() => setSuccessMsg(""), 3000)
+      toast.success("Cập nhật thông tin hồ sơ thành công!")
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || err.message || "Có lỗi xảy ra khi cập nhật hồ sơ.")
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi cập nhật hồ sơ.")
+      toast.error(msg)
     }
   })
 
@@ -336,11 +371,11 @@ export default function ProfilePage() {
       return data
     },
     onSuccess: () => {
-      setSuccessMsg(`Mã / Liên kết xác thực đã được gửi tới email ${profile?.email}. Vui lòng kiểm tra hộp thư của bạn!`)
-      setTimeout(() => setSuccessMsg(""), 6000)
+      toast.success(`Liên kết xác thực đã được gửi tới email ${profile?.email || email}. Vui lòng kiểm tra hộp thư!`)
     },
     onError: (err: any) => {
-      alert(err.response?.data?.message || err.message || "Không thể gửi email xác thực. Vui lòng thử lại sau.")
+      const msg = getVietnameseErrorMessage(err, "Không thể gửi email xác thực. Vui lòng thử lại sau.")
+      toast.error(msg)
     }
   })
 
@@ -352,7 +387,6 @@ export default function ProfilePage() {
   const handlePasswordSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     setPasswordError("")
-    setPasswordSuccess("")
     
     if (newPassword.length < 8) {
       setPasswordError("Mật khẩu mới phải dài ít nhất 8 ký tự")
@@ -368,7 +402,7 @@ export default function ProfilePage() {
     await new Promise((resolve) => setTimeout(resolve, 1000))
     setPasswordLoading(false)
     
-    setPasswordSuccess("Đổi mật khẩu thành công!")
+    toast.success("Đổi mật khẩu thành công!")
     setCurrentPassword("")
     setNewPassword("")
     setConfirmNewPassword("")
@@ -526,11 +560,6 @@ export default function ProfilePage() {
                 
                 <div className="flex flex-col md:flex-row gap-8 items-start">
                   <form onSubmit={handleSubmit} className="space-y-5 flex-1 w-full max-w-lg order-2 md:order-1">
-                    {successMsg && (
-                      <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-semibold">
-                        {successMsg}
-                      </div>
-                    )}
 
                     <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                       <div>
@@ -716,13 +745,6 @@ export default function ProfilePage() {
                   </button>
                 </div>
 
-                {successMsg && (
-                  <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-xl text-xs font-semibold flex items-center gap-2">
-                    <CheckCircle className="w-4 h-4 text-emerald-600 shrink-0" />
-                    <span>{successMsg}</span>
-                  </div>
-                )}
-
                 {addressLoading ? (
                   <div className="flex flex-col items-center justify-center py-12">
                     <Loader2 className="w-8 h-8 animate-spin text-[#1B4D3E]" />
@@ -842,11 +864,6 @@ export default function ProfilePage() {
                 </h3>
 
                 <form onSubmit={handlePasswordSubmit} className="space-y-5 max-w-lg">
-                  {passwordSuccess && (
-                    <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3 rounded-xl text-xs font-semibold">
-                      {passwordSuccess}
-                    </div>
-                  )}
                   {passwordError && (
                     <div className="bg-rose-50 border border-rose-200 text-rose-700 p-3 rounded-xl text-xs font-semibold">
                       {passwordError}
@@ -1013,8 +1030,34 @@ export default function ProfilePage() {
             )}
 
             {emailModalSuccess && (
-              <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
-                {emailModalSuccess}
+              <div className="space-y-4 mb-4">
+                <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
+                  {emailModalSuccess}
+                </div>
+                <div className="flex items-center justify-between text-xs font-semibold px-1">
+                  <span className="text-[#64716A]">Chưa nhận được email?</span>
+                  {emailCooldown > 0 ? (
+                    <span className="text-[#8E9B94]">Gửi lại sau {emailCooldown}s</span>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={async () => {
+                        setEmailModalError("")
+                        setEmailModalSuccess("")
+                        try {
+                          await userService.requestChangeEmail(email)
+                          setEmailCooldown(60)
+                          setEmailModalSuccess("Liên kết xác thực đã được gửi lại tới email của bạn!")
+                        } catch (err: any) {
+                          setEmailModalError(getVietnameseErrorMessage(err, "Không thể gửi lại email xác thực."))
+                        }
+                      }}
+                      className="text-emerald-700 font-extrabold hover:underline cursor-pointer disabled:opacity-50"
+                    >
+                      Gửi lại email
+                    </button>
+                  )}
+                </div>
               </div>
             )}
 
@@ -1029,9 +1072,10 @@ export default function ProfilePage() {
                     setEmailModalSuccess("")
                     try {
                       await userService.requestChangeEmail(email)
+                      setEmailCooldown(60)
                       setEmailModalSuccess("Liên kết xác thực đã được gửi tới email của bạn! Vui lòng kiểm tra hộp thư.")
                     } catch (err: any) {
-                      setEmailModalError(err.response?.data?.message || err.message || "Không thể gửi email xác thực.")
+                      setEmailModalError(getVietnameseErrorMessage(err, "Không thể gửi email xác thực."))
                     }
                   }}
                   className="w-full flex justify-center items-center py-2.5 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-xs transition-all cursor-pointer"
@@ -1134,6 +1178,21 @@ export default function ProfilePage() {
                         className="block w-full text-center tracking-[0.5em] text-lg font-bold px-3 py-2.5 bg-[#FDFBF7] border border-[#C6C0B0] rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-600/20 focus:border-emerald-600 transition-all text-[#1E2522]"
                         placeholder="••••••"
                       />
+                    </div>
+                    <div className="flex items-center justify-between text-xs font-semibold px-1">
+                      <span className="text-[#64716A]">Chưa nhận được mã OTP?</span>
+                      {phoneCooldown > 0 ? (
+                        <span className="text-[#8E9B94]">Gửi lại sau {phoneCooldown}s</span>
+                      ) : (
+                        <button
+                          type="button"
+                          onClick={handleSendPhoneOTP}
+                          disabled={phoneModalLoading}
+                          className="text-emerald-700 font-extrabold hover:underline cursor-pointer disabled:opacity-50"
+                        >
+                          Gửi lại mã OTP
+                        </button>
+                      )}
                     </div>
                     <div className="flex gap-3">
                       <button

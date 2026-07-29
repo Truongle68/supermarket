@@ -6,6 +6,8 @@ import Link from "next/link"
 import { useAuth } from "@/lib/store/useAuthStore"
 import { ArrowLeft, Loader2, Mail, CheckCircle, AlertCircle } from "lucide-react"
 import userService from "@/lib/services/user.service"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 function ChangeEmailForm() {
   const searchParams = useSearchParams()
@@ -21,6 +23,14 @@ function ChangeEmailForm() {
   const [successMsg, setSuccessMsg] = useState("")
   const [verifyingToken, setVerifyingToken] = useState(true)
   const [submitting, setSubmitting] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [cooldown])
 
   // Verify link token on mount
   useEffect(() => {
@@ -37,13 +47,16 @@ function ChangeEmailForm() {
         if (data?.change_email_token) {
           setChangeEmailToken(data.change_email_token)
         } else {
+          toast.success("Địa chỉ Email đã được xác thực thành công!")
           setSuccessMsg("Địa chỉ Email của bạn đã được xác thực thành công!")
           setTimeout(() => {
             router.push("/profile")
           }, 2500)
         }
       } catch (err: any) {
-        setErrorMsg(err.response?.data?.message || err.message || "Mã xác thực không hợp lệ hoặc đã hết hạn.")
+        const msg = getVietnameseErrorMessage(err, "Mã xác thực không hợp lệ hoặc đã hết hạn.")
+        toast.error(msg)
+        setErrorMsg(msg)
       } finally {
         setVerifyingToken(false)
       }
@@ -67,9 +80,37 @@ function ChangeEmailForm() {
         identifier: newEmail.trim()
       })
       setOtpSent(true)
+      setCooldown(60)
+      toast.success("Mã OTP đã được gửi tới email mới của bạn!")
       setSuccessMsg(`Mã OTP đã được gửi tới email mới: ${newEmail.trim()}. Vui lòng kiểm tra hộp thư!`)
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || err.message || "Có lỗi xảy ra khi gửi mã OTP tới email mới.")
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi mã OTP tới email mới.")
+      toast.error(msg)
+      setErrorMsg(msg)
+    } finally {
+      setSubmitting(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (!newEmail.trim() || !changeEmailToken) return
+
+    setErrorMsg("")
+    setSuccessMsg("")
+    setSubmitting(true)
+
+    try {
+      await userService.changeEmail({
+        change_email_token: changeEmailToken,
+        identifier: newEmail.trim()
+      })
+      setCooldown(60)
+      toast.success("Mã OTP đã được gửi lại!")
+      setSuccessMsg(`Mã OTP đã được gửi lại tới email: ${newEmail.trim()}`)
+    } catch (err: any) {
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi lại mã OTP.")
+      toast.error(msg)
+      setErrorMsg(msg)
     } finally {
       setSubmitting(false)
     }
@@ -92,6 +133,7 @@ function ChangeEmailForm() {
         code: otpCode,
         identifier: newEmail.trim()
       })
+      toast.success("Cập nhật địa chỉ Email mới thành công!")
       setSuccessMsg("Cập nhật địa chỉ Email mới thành công!")
 
       if (user && accessToken && refreshToken) {
@@ -102,7 +144,9 @@ function ChangeEmailForm() {
         router.push("/profile")
       }, 1000)
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || err.message || "Mã OTP không đúng hoặc đã hết hạn.")
+      const msg = getVietnameseErrorMessage(err, "Mã OTP không đúng hoặc đã hết hạn.")
+      toast.error(msg)
+      setErrorMsg(msg)
       setSubmitting(false)
     }
   }
@@ -118,12 +162,6 @@ function ChangeEmailForm() {
 
   return (
     <div className="bg-white py-8 px-4 border border-[#EBE6DA] shadow-sm rounded-[2rem] sm:px-10 w-full">
-      {errorMsg && (
-        <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-xs font-semibold flex items-start gap-2.5">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <div>{errorMsg}</div>
-        </div>
-      )}
 
       {successMsg && !otpSent && (
         <div className="space-y-6 text-center py-4">
@@ -181,11 +219,6 @@ function ChangeEmailForm() {
 
       {changeEmailToken && otpSent && (
         <form className="space-y-6" onSubmit={handleVerifyOtp}>
-          {successMsg && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
-              {successMsg}
-            </div>
-          )}
 
           <div>
             <label htmlFor="otp" className="block text-xs font-bold text-[#1E2522]">
@@ -204,6 +237,22 @@ function ChangeEmailForm() {
                 placeholder="••••••"
               />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className="text-[#64716A]">Chưa nhận được mã OTP?</span>
+            {cooldown > 0 ? (
+              <span className="text-[#8E9B94]">Gửi lại sau {cooldown}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={submitting}
+                className="text-emerald-700 font-extrabold hover:underline cursor-pointer disabled:opacity-50"
+              >
+                Gửi lại mã OTP
+              </button>
+            )}
           </div>
 
           <div className="flex gap-3">

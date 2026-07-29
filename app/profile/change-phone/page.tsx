@@ -6,6 +6,8 @@ import Link from "next/link"
 import { useAuth } from "@/lib/store/useAuthStore"
 import { ArrowLeft, Loader2, Phone, CheckCircle, AlertCircle } from "lucide-react"
 import userService from "@/lib/services/user.service"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 function ChangePhoneForm() {
   const router = useRouter()
@@ -20,6 +22,14 @@ function ChangePhoneForm() {
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
   const [loading, setLoading] = useState(false)
+  const [cooldown, setCooldown] = useState(0)
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [cooldown])
 
   useEffect(() => {
     if (token) {
@@ -45,9 +55,34 @@ function ChangePhoneForm() {
     try {
       await userService.changePhone(newPhone.trim(), changePhoneToken)
       setOtpSent(true)
+      setCooldown(60)
+      toast.success("Mã OTP đã được gửi đến số điện thoại mới!")
       setSuccessMsg(`Mã OTP xác thực đã được gửi đến số điện thoại: ${newPhone.trim()}`)
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || err.message || "Có lỗi xảy ra khi gửi mã OTP.")
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi mã OTP.")
+      toast.error(msg)
+      setErrorMsg(msg)
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleResendOtp = async () => {
+    if (!newPhone.trim() || !changePhoneToken) return
+
+    setErrorMsg("")
+    setSuccessMsg("")
+    setLoading(true)
+
+    try {
+      await userService.changePhone(newPhone.trim(), changePhoneToken)
+      setCooldown(60)
+      toast.success("Mã OTP đã được gửi lại!")
+      setSuccessMsg(`Mã OTP xác thực đã được gửi lại tới số điện thoại: ${newPhone.trim()}`)
+    } catch (err: any) {
+      const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi lại mã OTP.")
+      toast.error(msg)
+      setErrorMsg(msg)
     } finally {
       setLoading(false)
     }
@@ -70,6 +105,7 @@ function ChangePhoneForm() {
         phone: newPhone.trim()
       })
       setLoading(true)
+      toast.success("Cập nhật số điện thoại thành công!")
       setSuccessMsg("Cập nhật số điện thoại thành công!")
 
       if (user && accessToken && refreshToken) {
@@ -80,19 +116,15 @@ function ChangePhoneForm() {
         router.push("/profile")
       }, 1000)
     } catch (err: any) {
-      setErrorMsg(err.response?.data?.message || err.message || "Mã OTP không đúng hoặc đã hết hạn.")
+      const msg = getVietnameseErrorMessage(err, "Mã OTP không đúng hoặc đã hết hạn.")
+      toast.error(msg)
+      setErrorMsg(msg)
       setLoading(false)
     }
   }
 
   return (
     <div className="bg-white py-8 px-4 border border-[#EBE6DA] shadow-sm rounded-[2rem] sm:px-10 w-full">
-      {errorMsg && (
-        <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-xs font-semibold flex items-start gap-2.5">
-          <AlertCircle className="w-5 h-5 shrink-0 mt-0.5" />
-          <div>{errorMsg}</div>
-        </div>
-      )}
 
       {successMsg  && !otpSent && (
         <div className="space-y-6 text-center py-4">
@@ -148,11 +180,6 @@ function ChangePhoneForm() {
         </form>
       ) : (
         <form className="space-y-6" onSubmit={handleVerifyOtp}>
-          {successMsg && (
-            <div className="bg-emerald-50 border border-emerald-200 text-emerald-800 p-3.5 rounded-2xl text-xs font-semibold">
-              {successMsg}
-            </div>
-          )}
 
           <div>
             <label htmlFor="otp" className="block text-xs font-bold text-[#1E2522]">
@@ -171,6 +198,22 @@ function ChangePhoneForm() {
                 placeholder="••••••"
               />
             </div>
+          </div>
+
+          <div className="flex items-center justify-between text-xs font-semibold">
+            <span className="text-[#64716A]">Chưa nhận được mã OTP?</span>
+            {cooldown > 0 ? (
+              <span className="text-[#8E9B94]">Gửi lại sau {cooldown}s</span>
+            ) : (
+              <button
+                type="button"
+                onClick={handleResendOtp}
+                disabled={loading}
+                className="text-emerald-700 font-extrabold hover:underline cursor-pointer disabled:opacity-50"
+              >
+                Gửi lại mã OTP
+              </button>
+            )}
           </div>
 
           <div className="flex gap-3">
