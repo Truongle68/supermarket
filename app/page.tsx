@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react"
 import { useAuth } from "@/lib/store/useAuthStore"
 import { useProductStore, Product } from "@/lib/store/useProductStore"
+import { getCategoryName } from "@/lib/utils"
 import { Loader2, PackageSearch } from "lucide-react"
 
 // Home Modular Components
@@ -18,35 +19,59 @@ export default function Home() {
   const [selectedCategory, setSelectedCategory] = useState("all")
   const [searchTerm, setSearchTerm] = useState("")
   const [cartCount, setCartCount] = useState(0)
+  const [isPending, setIsPending] = useState(false)
 
   // Product Store
   const { 
     products, 
     categories, 
-    isLoading, 
+    apiCategories,
+    isLoading,
     fetchProductsFromApi,
-    fetchCategoriesFromApi
+    fetchCategoriesFromApi,
+    searchProductsFromApi
   } = useProductStore()
 
-  // Load API products & categories on mount
+  // Load API categories on mount
   useEffect(() => {
-    fetchProductsFromApi().catch(console.error)
     fetchCategoriesFromApi().catch(console.error)
-  }, [fetchProductsFromApi, fetchCategoriesFromApi])
+  }, [fetchCategoriesFromApi])
 
-  // Filter products by search & category
-  const displayProducts = products.filter((prod) => {
-    const matchesCategory = selectedCategory === "all" || prod.category === selectedCategory
-    const matchesSearch = searchTerm.trim() === "" || 
-      prod.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-      prod.category.toLowerCase().includes(searchTerm.toLowerCase())
-    return matchesCategory && matchesSearch
-  })
+  // Instant & Debounced API Search & Filter effect
+  useEffect(() => {
+    setIsPending(true)
+    const delay = searchTerm.trim() ? 300 : 0 // Instant for category clicks, 300ms debounce for text input
+
+    const timer = setTimeout(() => {
+      const selectedCatObj = apiCategories.find(
+        (c) => c.name_vi === selectedCategory || c.name_en === selectedCategory
+      )
+      const categoryId = selectedCatObj?.id
+
+      const req = searchTerm.trim()
+        ? searchProductsFromApi({
+            q: searchTerm.trim(),
+            category_id: categoryId,
+          })
+        : selectedCategory !== "all"
+        ? fetchProductsFromApi({ category_id: categoryId })
+        : fetchProductsFromApi()
+
+      req.finally(() => setIsPending(false))
+    }, delay)
+
+    return () => clearTimeout(timer)
+  }, [searchTerm, selectedCategory, apiCategories, searchProductsFromApi, fetchProductsFromApi])
+
+  // Products returned from Backend API are already filtered
+  const displayProducts = products
 
   // Add to cart handler
   const handleAddToCart = (product: Product) => {
     setCartCount((prev) => prev + 1)
   }
+
+  const showLoading = isLoading || isPending
 
   return (
     <div className="min-h-screen bg-[#FDFBF7] text-[#1E2522] font-sans antialiased flex flex-col justify-between">
@@ -62,15 +87,15 @@ export default function Home() {
           onLogout={logout}
         />
 
-        {/* Main Body */}
-        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8 space-y-10">
-          
-          {/* Hero Banner Section */}
-          <HomeHeroBanner />
+        {/* Hero Section */}
+        <HomeHeroBanner />
 
-          {/* Category Filter Pills Section */}
-          <section id="products-section" className="space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        {/* Main Content Area */}
+        <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-10 space-y-12">
+          
+          {/* Category Bar Section */}
+          <section className="space-y-4">
+            <div className="flex items-center justify-between">
               <div>
                 <h2 className="text-2xl font-black text-[#16422F]">Danh mục sản phẩm</h2>
                 <p className="text-xs text-[#64716A] font-semibold mt-1">Lựa chọn thực phẩm tươi ngon mỗi ngày theo từng nhóm hàng</p>
@@ -90,12 +115,12 @@ export default function Home() {
               <h2 className="text-xl font-black text-[#16422F]">
                 {selectedCategory === "all" ? "Tất cả sản phẩm" : selectedCategory}
                 <span className="text-xs font-bold text-[#8E9B94] ml-2 font-sans">
-                  ({displayProducts.length} sản phẩm)
+                  ({showLoading ? "..." : displayProducts.length} sản phẩm)
                 </span>
               </h2>
             </div>
 
-            {isLoading ? (
+            {showLoading ? (
               <div className="flex flex-col items-center justify-center py-24 text-[#8E9B94]">
                 <Loader2 className="w-8 h-8 text-emerald-600 animate-spin mb-2" />
                 <span className="text-xs font-bold">Đang tải danh sách sản phẩm...</span>

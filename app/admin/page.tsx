@@ -57,19 +57,49 @@ export default function AdminDashboard() {
   const { 
     products, 
     categories, 
+    apiCategories,
+    isLoading,
     addProduct, 
     updateProduct, 
     deleteProduct, 
     toggleProductStatus,
     fetchProductsFromApi,
-    fetchCategoriesFromApi
+    fetchCategoriesFromApi,
+    searchProductsFromApi
   } = useProductStore()
 
-  // Load backend API data on mount
+  const [isPending, setIsPending] = useState(false)
+
+  // Load backend API categories on mount
   useEffect(() => {
-    fetchProductsFromApi().catch(console.error)
     fetchCategoriesFromApi().catch(console.error)
-  }, [fetchProductsFromApi, fetchCategoriesFromApi])
+  }, [fetchCategoriesFromApi])
+
+  // Instant & Debounced API Search for Admin Products
+  useEffect(() => {
+    setIsPending(true)
+    const delay = productSearch.trim() ? 300 : 0
+
+    const timer = setTimeout(() => {
+      const selectedCatObj = apiCategories.find(
+        (c) => c.name_vi === categoryFilter || c.name_en === categoryFilter
+      )
+      const categoryId = selectedCatObj?.id
+
+      const req = productSearch.trim()
+        ? searchProductsFromApi({
+            q: productSearch.trim(),
+            category_id: categoryId,
+          })
+        : categoryFilter !== "all"
+        ? fetchProductsFromApi({ category_id: categoryId })
+        : fetchProductsFromApi()
+
+      req.finally(() => setIsPending(false))
+    }, delay)
+
+    return () => clearTimeout(timer)
+  }, [productSearch, categoryFilter, apiCategories, searchProductsFromApi, fetchProductsFromApi])
 
   const isAdmin = user?.role?.toLowerCase() === 'admin'
 
@@ -195,6 +225,7 @@ export default function AdminDashboard() {
                 setCategoryFilter={setCategoryFilter}
                 statusFilter={statusFilter}
                 setStatusFilter={setStatusFilter}
+                isLoading={isLoading || isPending}
                 onAddClick={() => {
                   setEditingProduct(null)
                   setIsAddModalOpen(true)

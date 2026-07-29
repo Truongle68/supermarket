@@ -1,8 +1,8 @@
 'use client'
 
-import { Search, Plus, Eye, EyeOff, Edit3, Trash2, Package } from "lucide-react"
+import { Search, Plus, Eye, EyeOff, Edit3, Trash2, Package, Loader2 } from "lucide-react"
 import { Product } from "@/lib/store/useProductStore"
-import { formatPriceVND } from "@/lib/utils"
+import { formatPriceVND, getCategoryName } from "@/lib/utils"
 import { ProductThumbnail } from "./ProductThumbnail"
 
 interface AdminProductsTableProps {
@@ -18,6 +18,7 @@ interface AdminProductsTableProps {
   onEditClick: (product: Product) => void
   onDeleteClick: (product: Product) => void
   onToggleStatus: (id: string) => void
+  isLoading?: boolean
 }
 
 export function AdminProductsTable({
@@ -33,18 +34,19 @@ export function AdminProductsTable({
   onEditClick,
   onDeleteClick,
   onToggleStatus,
+  isLoading = false,
 }: AdminProductsTableProps) {
-  // Filter products based on search term, category, and status
+  // Filter products based on status and optional client search
   const filteredProducts = products.filter((item) => {
     const matchesSearch = 
+      !productSearch.trim() ||
       item.name.toLowerCase().includes(productSearch.toLowerCase()) ||
       item.id.toLowerCase().includes(productSearch.toLowerCase()) ||
       item.sku.toLowerCase().includes(productSearch.toLowerCase())
     
-    const matchesCategory = categoryFilter === "all" || item.category === categoryFilter
     const matchesStatus = statusFilter === "all" || item.status === statusFilter
 
-    return matchesSearch && matchesCategory && matchesStatus
+    return matchesSearch && matchesStatus
   })
 
   return (
@@ -107,7 +109,12 @@ export function AdminProductsTable({
       </div>
 
       {/* Table Container */}
-      {filteredProducts.length > 0 ? (
+      {isLoading ? (
+        <div className="flex flex-col items-center justify-center py-16 text-[#8E9B94]">
+          <Loader2 className="w-8 h-8 text-[#1DA1F2] animate-spin mb-2" />
+          <span className="text-xs font-bold">Đang tải danh sách sản phẩm...</span>
+        </div>
+      ) : filteredProducts.length > 0 ? (
         <div className="overflow-x-auto rounded-xl border border-[#F3EFE6]">
           <table className="w-full text-left border-collapse">
             <thead>
@@ -143,7 +150,7 @@ export function AdminProductsTable({
                   {/* Category */}
                   <td className="py-3.5 px-4">
                     <span className="inline-block bg-slate-100 text-slate-700 px-2.5 py-1 rounded-md text-2xs font-bold border border-slate-200">
-                      {item.category}
+                      {getCategoryName(item.category) || "Chưa phân loại"}
                     </span>
                   </td>
 

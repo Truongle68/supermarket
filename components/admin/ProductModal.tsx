@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from "react"
 import { Product } from "@/lib/store/useProductStore"
+import { getCategoryName } from "@/lib/utils"
 import { X, Tag, Package, DollarSign, Image as ImageIcon, Layers, FileText, Check, AlertCircle } from "lucide-react"
 
 interface ProductModalProps {
@@ -34,7 +35,7 @@ export function ProductModal({
   useEffect(() => {
     if (initialData) {
       setName(initialData.name || "")
-      setCategory(initialData.category || categories[0] || "")
+      setCategory(getCategoryName(initialData.category) || categories[0] || "")
       setPrice(initialData.price ? String(initialData.price) : "")
       setOriginalPrice(initialData.originalPrice ? String(initialData.originalPrice) : "")
       setStock(initialData.stock !== undefined ? String(initialData.stock) : "")

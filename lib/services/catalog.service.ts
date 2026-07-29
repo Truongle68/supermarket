@@ -76,7 +76,7 @@ export const catalogService = {
     return res.data;
   },
 
-  searchProducts: async (params?: SearchProductsQuery): Promise<ApiResponse<SearchProductsResponse>> => {
+  searchProducts: async (params?: SearchProductsQuery): Promise<ApiResponse<CatalogProduct[] | SearchProductsResponse>> => {
     const res = await httpClient.get(ENDPOINT.CATALOG.PRODUCT_SEARCH, { params });
     return res.data;
   },

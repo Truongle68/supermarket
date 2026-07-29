@@ -1,6 +1,7 @@
 'use client'
 
 import { Product } from "@/lib/store/useProductStore"
+import { getCategoryName } from "@/lib/utils"
 import { AlertTriangle, Trash2, X, Package } from "lucide-react"
 
 interface DeleteConfirmModalProps {
@@ -54,7 +55,7 @@ export function DeleteConfirmModal({
           </span>
           <div className="min-w-0 flex-1">
             <h4 className="text-xs font-extrabold text-[#16422F] truncate">{product.name}</h4>
-            <span className="text-2xs text-[#8E9B94] font-bold block">{product.id} · {product.sku} · {product.category}</span>
+            <span className="text-2xs text-[#8E9B94] font-bold block">{product.id} · {product.sku} · {getCategoryName(product.category)}</span>
           </div>
         </div>
 

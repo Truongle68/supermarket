@@ -33,8 +33,6 @@ export interface ProductVariant {
   variant_label: string;
   price_delta?: number;
   sku: string;
-  created_at?: string;
-  updated_at?: string;
 }
 
 export interface CreateProductVariantRequest {
@@ -47,8 +45,6 @@ export interface ProductImage {
   id?: string;
   url: string;
   sort_order?: number;
-  created_at?: string;
-  updated_at?: string;
 }
 
 export interface CreateProductImageRequest {
@@ -56,9 +52,19 @@ export interface CreateProductImageRequest {
   sort_order?: number;
 }
 
+export interface DetailedCategory {
+  id: string;
+  name_vi: string;
+  name_en: string;
+  slug: string;
+  icon: string;
+  sort_order: number;
+}
+
 export interface CatalogProduct {
   id: string;
-  category_id: string;
+  category_id?: string;
+  category?: DetailedCategory | null;
   sku: string;
   name_vi: string;
   name_en: string;
