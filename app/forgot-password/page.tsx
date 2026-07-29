@@ -1,15 +1,25 @@
 'use client'
 
-import { useState } from "react"
+import { useState, useEffect } from "react"
 import Link from "next/link"
 import { useMutation } from "@tanstack/react-query"
 import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Mail, CheckCircle2 } from "lucide-react"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 export default function ForgotPasswordPage() {
   const [email, setEmail] = useState("")
   const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
+  const [cooldown, setCooldown] = useState(0)
+
+  useEffect(() => {
+    if (cooldown > 0) {
+      const timer = setTimeout(() => setCooldown(cooldown - 1), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [cooldown])
 
   const forgotPasswordMutation = useMutation({
     mutationFn: async () => {
@@ -17,15 +27,25 @@ export default function ForgotPasswordPage() {
       return data.data
     },
     onSuccess: () => {
+      toast.success("Yêu cầu khôi phục mật khẩu đã được gửi thành công!")
       setSuccessMsg("Yêu cầu khôi phục mật khẩu đã được gửi thành công! Vui lòng kiểm tra hộp thư của bạn.")
+      setCooldown(60)
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Không thể thực hiện yêu cầu. Vui lòng kiểm tra lại email.")
+      const msg = getVietnameseErrorMessage(err, "Không thể thực hiện yêu cầu. Vui lòng kiểm tra lại email.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault()
+    setErrorMsg("")
+    setSuccessMsg("")
+    forgotPasswordMutation.mutate()
+  }
+
+  const handleResend = () => {
     setErrorMsg("")
     setSuccessMsg("")
     forgotPasswordMutation.mutate()
@@ -64,11 +84,6 @@ export default function ForgotPasswordPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md z-10">
         <div className="bg-white py-8 px-4 border border-[#EBE6DA] shadow-sm rounded-[2rem] sm:px-10">
-          {errorMsg && (
-            <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-sm font-semibold">
-              {errorMsg}
-            </div>
-          )}
 
           {successMsg ? (
             <div className="space-y-6 text-center">
@@ -79,7 +94,23 @@ export default function ForgotPasswordPage() {
                 {successMsg}
               </div>
 
-              <div className="pt-4">
+              <div className="flex items-center justify-between text-xs font-semibold px-2">
+                <span className="text-[#64716A]">Không nhận được email?</span>
+                {cooldown > 0 ? (
+                  <span className="text-[#8E9B94]">Gửi lại sau {cooldown}s</span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={handleResend}
+                    disabled={forgotPasswordMutation.isPending}
+                    className="text-emerald-700 font-extrabold hover:underline cursor-pointer disabled:opacity-50"
+                  >
+                    Gửi lại email
+                  </button>
+                )}
+              </div>
+
+              <div className="pt-2">
                 <Link
                   href="/login"
                   className="w-full flex justify-center items-center py-3 px-4 border border-[#1B4D3E] rounded-2xl shadow-sm text-sm font-bold text-[#1B4D3E] hover:bg-[#FAF6EC] focus:outline-none transition-all cursor-pointer"

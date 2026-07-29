@@ -10,6 +10,8 @@ import { setTokens } from "@/lib/utils/tokenManager"
 import { ArrowLeft, Loader2, Lock, UserCog, User } from "lucide-react"
 import userService from "@/lib/services/user.service"
 import { UserRole } from "@/lib/types"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 export default function PortalLoginPage() {
   const router = useRouter()
@@ -55,6 +57,7 @@ export default function PortalLoginPage() {
       }
     },
     onSuccess: (data) => {
+      toast.success("Đăng nhập portal thành công!")
       login(data.user, data.accessToken, data.refreshToken)
       const role = data.user.role?.toLowerCase()
       if (role === "staff") {
@@ -64,7 +67,9 @@ export default function PortalLoginPage() {
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin portal.")
+      const msg = getVietnameseErrorMessage(err, "Đăng nhập thất bại. Vui lòng kiểm tra thông tin portal.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
@@ -108,11 +113,6 @@ export default function PortalLoginPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md z-10">
         <div className="bg-slate-900 border border-slate-800 py-8 px-4 shadow-2xl rounded-[1.3rem] sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {errorMsg && (
-              <div className="bg-rose-950/30 border border-rose-900/50 text-rose-400 p-4 rounded-xl text-sm font-semibold">
-                {errorMsg}
-              </div>
-            )}
 
             <div>
               <label htmlFor="identifier" className="block text-xs font-bold uppercase tracking-wider text-slate-400">

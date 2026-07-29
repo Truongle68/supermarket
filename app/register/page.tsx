@@ -9,6 +9,8 @@ import { ArrowLeft, Loader2, Lock, User, Phone, KeyRound, Check, RefreshCw } fro
 import { setTokens } from "@/lib/utils/tokenManager"
 import { useAuth } from "@/lib/store/useAuthStore"
 import userService from "@/lib/services/user.service"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 export default function RegisterPage() {
   const router = useRouter()
@@ -66,7 +68,7 @@ export default function RegisterPage() {
         }
       } catch (err: any) {
         setIsUsernameAvailable(null)
-        setUsernameError(err.response?.data?.message || err.message || "Lỗi kiểm tra tên đăng nhập")
+        setUsernameError(getVietnameseErrorMessage(err, "Lỗi kiểm tra tên đăng nhập"))
       } finally {
         setUsernameCheckLoading(false)
       }
@@ -85,12 +87,15 @@ export default function RegisterPage() {
       return data;
     },
     onSuccess: (data) => {
+      toast.success("Mã xác thực OTP đã được gửi!")
       setSuccessMsg(`Mã xác thực OTP đã được gửi!`)
       setStep(2)
       setCooldown(60) // Start 60s cooldown
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Không thể gửi mã OTP. Vui lòng thử lại.")
+      const msg = getVietnameseErrorMessage(err, "Không thể gửi mã OTP. Vui lòng thử lại.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
@@ -107,8 +112,11 @@ export default function RegisterPage() {
       setVerificationToken(data.verify_otp_token)
       if (data.user_exists) {
         setIsPhoneRegistered(true)
-        setErrorMsg(`Số điện thoại này đã được đăng ký với tên tài khoản: ${data.username}`)
+        const msg = `Số điện thoại này đã được đăng ký với tên tài khoản: ${data.username}`
+        toast.error(msg)
+        setErrorMsg(msg)
       } else {
+        toast.success("Xác thực OTP thành công!")
         setSuccessMsg("Xác thực OTP thành công!")
         setTimeout(() => {
           setSuccessMsg("")
@@ -117,7 +125,9 @@ export default function RegisterPage() {
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Xác thực OTP thất bại.")
+      const msg = getVietnameseErrorMessage(err, "Xác thực OTP thất bại.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
@@ -171,6 +181,7 @@ export default function RegisterPage() {
       }
     },
     onSuccess: (data) => {
+      toast.success("Đăng ký tài khoản thành công!")
       setSuccessMsg("Đăng ký tài khoản thành công! Đang đăng nhập...")
       login(data.user, data.accessToken, data.refreshToken)
       setTimeout(() => {
@@ -178,7 +189,9 @@ export default function RegisterPage() {
       }, 2000)
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Không thể hoàn thành đăng ký.")
+      const msg = getVietnameseErrorMessage(err, "Không thể hoàn thành đăng ký.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
@@ -276,28 +289,15 @@ export default function RegisterPage() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md z-10">
         <div className="bg-white py-8 px-4 border border-[#EBE6DA] shadow-sm rounded-[2rem] sm:px-10">
-          
-          {/* Global Alert Messages */}
-          {errorMsg && (
+          {isPhoneRegistered && (
             <div className="mb-4 bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-xs font-semibold">
-              {errorMsg}
-              {isPhoneRegistered && (
-                <div className="mt-3 pt-3 border-t border-rose-200/50 flex flex-col gap-2">
-                  <p className="text-rose-800 text-2xs font-bold">Bạn đã có tài khoản với số điện thoại này?</p>
-                  <Link
-                    href="/login"
-                    className="inline-flex justify-center items-center py-2 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-2xs shadow-sm transition-all"
-                  >
-                    Đăng nhập ngay
-                  </Link>
-                </div>
-              )}
-            </div>
-          )}
-
-          {successMsg && (
-            <div className="mb-4 bg-emerald-50 border border-emerald-200 text-emerald-800 p-4 rounded-2xl text-xs font-semibold">
-              {successMsg}
+              <p className="text-rose-800 text-2xs font-bold">Số điện thoại này đã được đăng ký tài khoản. Bạn đã có tài khoản?</p>
+              <Link
+                href="/login"
+                className="mt-2 inline-flex justify-center items-center py-2 px-4 bg-[#1B4D3E] hover:bg-[#12362C] text-white font-bold rounded-xl text-2xs shadow-sm transition-all"
+              >
+                Đăng nhập ngay
+              </Link>
             </div>
           )}
 

@@ -6,6 +6,8 @@ import { useRouter, useSearchParams } from "next/navigation"
 import { useMutation } from "@tanstack/react-query"
 import { authService } from "@/lib/services/auth.service"
 import { ArrowLeft, Loader2, Lock, CheckCircle2 } from "lucide-react"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 function ResetPasswordForm() {
   const router = useRouter()
@@ -46,13 +48,16 @@ function ResetPasswordForm() {
       return data
     },
     onSuccess: () => {
+      toast.success("Đổi mật khẩu thành công!")
       setSuccessMsg("Đổi mật khẩu thành công! Đang chuyển hướng về trang đăng nhập...")
       setTimeout(() => {
         router.push("/login")
       }, 3000)
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại thông tin.")
+      const msg = getVietnameseErrorMessage(err, "Đổi mật khẩu thất bại. Vui lòng kiểm tra lại thông tin.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
@@ -96,12 +101,6 @@ function ResetPasswordForm() {
 
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md z-10">
         <div className="bg-white py-8 px-4 border border-[#EBE6DA] shadow-sm rounded-[2rem] sm:px-10">
-          
-          {errorMsg && (
-            <div className="mb-6 bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-sm font-semibold">
-              {errorMsg}
-            </div>
-          )}
 
           {successMsg ? (
             <div className="space-y-6 text-center">

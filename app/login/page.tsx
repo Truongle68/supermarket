@@ -10,6 +10,8 @@ import { setTokens } from "@/lib/utils/tokenManager"
 import { ArrowLeft, Loader2, Lock, User } from "lucide-react"
 import userService from "@/lib/services/user.service"
 import { UserRole } from "@/lib/types"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 export default function LoginPage() {
   const router = useRouter()
@@ -54,6 +56,7 @@ export default function LoginPage() {
       }
     },
     onSuccess: (data) => {
+      toast.success("Đăng nhập thành công!")
       login(data.user, data.accessToken, data.refreshToken)
       const role = data.user.role?.toLowerCase()
       if (role === 'admin') {
@@ -65,7 +68,9 @@ export default function LoginPage() {
       }
     },
     onError: (err: any) => {
-      setErrorMsg(err.response?.data?.message || err.message || "Đăng nhập thất bại. Vui lòng kiểm tra thông tin.")
+      const msg = getVietnameseErrorMessage(err, "Đăng nhập thất bại. Vui lòng kiểm tra thông tin.")
+      toast.error(msg)
+      setErrorMsg(msg)
     }
   })
 
@@ -112,11 +117,6 @@ export default function LoginPage() {
       <div className="mt-8 sm:mx-auto sm:w-full sm:max-w-md z-10">
         <div className="bg-white py-8 px-4 border border-[#EBE6DA] shadow-sm rounded-[2rem] sm:px-10">
           <form className="space-y-6" onSubmit={handleSubmit}>
-            {errorMsg && (
-              <div className="bg-rose-50 border border-rose-200 text-rose-700 p-4 rounded-2xl text-sm font-semibold">
-                {errorMsg}
-              </div>
-            )}
 
             <div>
               <label htmlFor="identifier" className="block text-sm font-bold text-[#1E2522]">

@@ -6,6 +6,8 @@ import Link from "next/link"
 import { useAuth } from "@/lib/store/useAuthStore"
 import { ArrowLeft, Loader2, CheckCircle, AlertCircle } from "lucide-react"
 import userService from "@/lib/services/user.service"
+import getVietnameseErrorMessage from "@/lib/utils/errorMapper"
+import { toast } from "sonner"
 
 function ConfirmEmailLinkContent() {
   const searchParams = useSearchParams()
@@ -19,27 +21,22 @@ function ConfirmEmailLinkContent() {
 
   useEffect(() => {
     if (!token) {
-      setErrorMsg("Liên kết xác thực email không hợp lệ hoặc đã hết hạn.")
+      const msg = "Không tìm thấy mã token xác thực."
+      toast.error(msg)
+      setErrorMsg(msg)
       setVerifying(false)
       return
     }
 
     const confirmToken = async () => {
       try {
-        const res = await userService.confirmEmailLink(token)
-        const data = res.data
-
-        if (data?.change_email_token) {
-          // If purpose was verify_current_email, redirect to change-email form page immediately while keeping loader active
-          router.replace(`/profile/change-email?token=${encodeURIComponent(token)}`)
-          return
-        }
-
-        // If purpose was verify_new_email (verifying new/first email)
-        if (accessToken) {
+        await userService.confirmEmailLink(token)
+        
+        // Refresh local user profile if logged in
+        if (user && accessToken) {
           try {
             const profileRes = await userService.getProfile()
-            if (profileRes?.data && user) {
+            if (profileRes.data) {
               login(
                 {
                   ...user,
@@ -55,6 +52,7 @@ function ConfirmEmailLinkContent() {
           }
         }
 
+        toast.success("Địa chỉ Email đã được xác thực thành công!")
         setSuccessMsg("Địa chỉ Email của bạn đã được xác thực thành công!")
         setVerifying(false)
         
@@ -63,7 +61,9 @@ function ConfirmEmailLinkContent() {
           router.replace("/profile")
         }, 1500)
       } catch (err: any) {
-        setErrorMsg(err.response?.data?.message || err.message || "Mã xác thực không hợp lệ hoặc đã hết hạn.")
+        const msg = getVietnameseErrorMessage(err, "Mã xác thực không hợp lệ hoặc đã hết hạn.")
+        toast.error(msg)
+        setErrorMsg(msg)
         setVerifying(false)
       }
     }
