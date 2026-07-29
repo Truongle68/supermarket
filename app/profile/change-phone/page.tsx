@@ -19,10 +19,10 @@ function ChangePhoneForm() {
   const [changePhoneToken, setChangePhoneToken] = useState("")
   const [otpCode, setOtpCode] = useState("")
   const [otpSent, setOtpSent] = useState(false)
-  const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
   const [loading, setLoading] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [isCompleted, setIsCompleted] = useState(false)
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -35,20 +35,19 @@ function ChangePhoneForm() {
     if (token) {
       setChangePhoneToken(token)
     } else {
-      setErrorMsg("Không tìm thấy mã xác thực (token). Vui lòng thực hiện xác thực từ trang Hồ sơ.")
+      toast.error("Không tìm thấy mã xác thực (token). Vui lòng thực hiện xác thực từ trang Hồ sơ.")
     }
   }, [token])
 
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newPhone.trim()) return
+    if (!newPhone.trim() || isCompleted) return
 
     if (!changePhoneToken) {
-      setErrorMsg("Thiếu token xác thực. Vui lòng thực hiện xác thực tài khoản từ trang Hồ sơ.")
+      toast.error("Thiếu token xác thực. Vui lòng thực hiện xác thực tài khoản từ trang Hồ sơ.")
       return
     }
 
-    setErrorMsg("")
     setSuccessMsg("")
     setLoading(true)
 
@@ -61,16 +60,14 @@ function ChangePhoneForm() {
     } catch (err: any) {
       const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi mã OTP.")
       toast.error(msg)
-      setErrorMsg(msg)
     } finally {
       setLoading(false)
     }
   }
 
   const handleResendOtp = async () => {
-    if (!newPhone.trim() || !changePhoneToken) return
+    if (!newPhone.trim() || !changePhoneToken || isCompleted) return
 
-    setErrorMsg("")
     setSuccessMsg("")
     setLoading(true)
 
@@ -82,7 +79,6 @@ function ChangePhoneForm() {
     } catch (err: any) {
       const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi lại mã OTP.")
       toast.error(msg)
-      setErrorMsg(msg)
     } finally {
       setLoading(false)
     }
@@ -90,12 +86,11 @@ function ChangePhoneForm() {
 
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!otpCode || otpCode.length !== 6) {
-      setErrorMsg("Mã OTP phải gồm 6 chữ số")
+    if (!otpCode || otpCode.length !== 6 || isCompleted) {
+      if (!isCompleted) toast.error("Mã OTP phải gồm 6 chữ số")
       return
     }
 
-    setErrorMsg("")
     setSuccessMsg("")
     setLoading(true)
 
@@ -104,12 +99,29 @@ function ChangePhoneForm() {
         code: otpCode.trim(),
         phone: newPhone.trim()
       })
+      setIsCompleted(true)
       setLoading(true)
       toast.success("Cập nhật số điện thoại thành công!")
       setSuccessMsg("Cập nhật số điện thoại thành công!")
 
       if (user && accessToken && refreshToken) {
-        login({ ...user, phone: newPhone.trim() }, accessToken, refreshToken)
+        try {
+          const profileRes = await userService.getProfile()
+          if (profileRes.data) {
+            login(
+              {
+                ...user,
+                phone: profileRes.data.phone || newPhone.trim(),
+                email: profileRes.data.email || user.email,
+                name: profileRes.data.full_name || user.name,
+              },
+              accessToken,
+              refreshToken
+            )
+          }
+        } catch (e) {
+          login({ ...user, phone: newPhone.trim() }, accessToken, refreshToken)
+        }
       }
 
       setTimeout(() => {
@@ -118,7 +130,6 @@ function ChangePhoneForm() {
     } catch (err: any) {
       const msg = getVietnameseErrorMessage(err, "Mã OTP không đúng hoặc đã hết hạn.")
       toast.error(msg)
-      setErrorMsg(msg)
       setLoading(false)
     }
   }

@@ -19,11 +19,11 @@ function ChangeEmailForm() {
   const [newEmail, setNewEmail] = useState("")
   const [otpCode, setOtpCode] = useState("")
   const [otpSent, setOtpSent] = useState(false)
-  const [errorMsg, setErrorMsg] = useState("")
   const [successMsg, setSuccessMsg] = useState("")
   const [verifyingToken, setVerifyingToken] = useState(true)
   const [submitting, setSubmitting] = useState(false)
   const [cooldown, setCooldown] = useState(0)
+  const [isCompleted, setIsCompleted] = useState(false)
 
   useEffect(() => {
     if (cooldown > 0) {
@@ -35,7 +35,7 @@ function ChangeEmailForm() {
   // Verify link token on mount
   useEffect(() => {
     if (!token) {
-      setErrorMsg("Liên kết xác thực email không hợp lệ hoặc đã hết hạn.")
+      toast.error("Không tìm thấy mã xác thực (token). Vui lòng thực hiện xác thực từ trang Hồ sơ.")
       setVerifyingToken(false)
       return
     }
@@ -56,7 +56,6 @@ function ChangeEmailForm() {
       } catch (err: any) {
         const msg = getVietnameseErrorMessage(err, "Mã xác thực không hợp lệ hoặc đã hết hạn.")
         toast.error(msg)
-        setErrorMsg(msg)
       } finally {
         setVerifyingToken(false)
       }
@@ -68,9 +67,8 @@ function ChangeEmailForm() {
   // Step 1: Send OTP to new email
   const handleSendOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!newEmail.trim() || !changeEmailToken) return
+    if (!newEmail.trim() || !changeEmailToken || isCompleted) return
 
-    setErrorMsg("")
     setSuccessMsg("")
     setSubmitting(true)
 
@@ -86,16 +84,14 @@ function ChangeEmailForm() {
     } catch (err: any) {
       const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi mã OTP tới email mới.")
       toast.error(msg)
-      setErrorMsg(msg)
     } finally {
       setSubmitting(false)
     }
   }
 
   const handleResendOtp = async () => {
-    if (!newEmail.trim() || !changeEmailToken) return
+    if (!newEmail.trim() || !changeEmailToken || isCompleted) return
 
-    setErrorMsg("")
     setSuccessMsg("")
     setSubmitting(true)
 
@@ -110,7 +106,6 @@ function ChangeEmailForm() {
     } catch (err: any) {
       const msg = getVietnameseErrorMessage(err, "Có lỗi xảy ra khi gửi lại mã OTP.")
       toast.error(msg)
-      setErrorMsg(msg)
     } finally {
       setSubmitting(false)
     }
@@ -119,12 +114,11 @@ function ChangeEmailForm() {
   // Step 2: Verify OTP code and complete email change
   const handleVerifyOtp = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!otpCode || otpCode.length !== 6) {
-      setErrorMsg("Mã OTP phải gồm 6 chữ số")
+    if (!otpCode || otpCode.length !== 6 || isCompleted) {
+      if (!isCompleted) toast.error("Mã OTP phải gồm 6 chữ số")
       return
     }
 
-    setErrorMsg("")
     setSuccessMsg("")
     setSubmitting(true)
 
@@ -133,11 +127,28 @@ function ChangeEmailForm() {
         code: otpCode,
         identifier: newEmail.trim()
       })
+      setIsCompleted(true)
       toast.success("Cập nhật địa chỉ Email mới thành công!")
       setSuccessMsg("Cập nhật địa chỉ Email mới thành công!")
 
       if (user && accessToken && refreshToken) {
-        login({ ...user, email: newEmail.trim() }, accessToken, refreshToken)
+        try {
+          const profileRes = await userService.getProfile()
+          if (profileRes.data) {
+            login(
+              {
+                ...user,
+                email: profileRes.data.email || newEmail.trim(),
+                phone: profileRes.data.phone || user.phone,
+                name: profileRes.data.full_name || user.name,
+              },
+              accessToken,
+              refreshToken
+            )
+          }
+        } catch (e) {
+          login({ ...user, email: newEmail.trim() }, accessToken, refreshToken)
+        }
       }
 
       setTimeout(() => {
@@ -146,7 +157,6 @@ function ChangeEmailForm() {
     } catch (err: any) {
       const msg = getVietnameseErrorMessage(err, "Mã OTP không đúng hoặc đã hết hạn.")
       toast.error(msg)
-      setErrorMsg(msg)
       setSubmitting(false)
     }
   }

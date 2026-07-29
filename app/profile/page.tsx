@@ -314,6 +314,8 @@ export default function ProfilePage() {
       return data.data
     },
     enabled: !!accessToken,
+    refetchOnMount: "always",
+    staleTime: 0,
   })
 
   // Load profile states when loaded from backend

@@ -33,7 +33,12 @@ httpClient.interceptors.response.use(
   },
   async (error) => {
     const originalRequest = error.config;
-    console.error(`[HTTP Error] ${error.response?.status || error.message} for ${originalRequest?.url}`);
+    const status = error.response?.status;
+    if (status && status < 500) {
+      console.warn(`[HTTP ${status}] ${error.response?.data?.message || error.message} for ${originalRequest?.url}`);
+    } else {
+      console.error(`[HTTP Error] ${status || error.message} for ${originalRequest?.url}`);
+    }
 
     if (error.response?.status === 401 && originalRequest && !originalRequest._retry) {
       // Don't retry if this is the login or refresh endpoint itself
